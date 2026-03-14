@@ -72,11 +72,6 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
               </option>
             ))}
           </select>
-          {selectedLeagueId && (
-            <p className="selected-league">
-              Currently selected: {leagues.find(l => l.id === selectedLeagueId)?.name}
-            </p>
-          )}
         </>
       )}
 

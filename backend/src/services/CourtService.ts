@@ -43,6 +43,12 @@ export class CourtService {
   getCourts(leagueId: string): Court[] {
     return dataStore.getCourtsByLeague(leagueId);
   }
+  /**
+   * Delete a court from a league
+   */
+  deleteCourt(courtId: string): boolean {
+    return dataStore.deleteCourt(courtId);
+  }
 
   /**
    * Validate a court identifier

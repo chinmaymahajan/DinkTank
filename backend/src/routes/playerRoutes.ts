@@ -63,4 +63,29 @@ router.get('/leagues/:leagueId/players', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/players/:playerId
+ * Remove a player
+ */
+router.delete('/players/:playerId', (req: Request, res: Response) => {
+  try {
+    const { playerId } = req.params;
+    const deleted = playerService.deletePlayer(playerId);
+    if (!deleted) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Player not found' }
+      });
+    }
+    res.json({ message: 'Player deleted' });
+  } catch (error) {
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to delete player',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
 export default router;

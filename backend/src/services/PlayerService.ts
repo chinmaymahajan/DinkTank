@@ -43,6 +43,12 @@ export class PlayerService {
   getPlayers(leagueId: string): Player[] {
     return dataStore.getPlayersByLeague(leagueId);
   }
+  /**
+   * Delete a player from a league
+   */
+  deletePlayer(playerId: string): boolean {
+    return dataStore.deletePlayer(playerId);
+  }
 
   /**
    * Validate a player name

@@ -64,6 +64,13 @@ export const api = {
     return handleResponse<Player[]>(response);
   },
 
+  async deletePlayer(playerId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/players/${playerId}`, {
+      method: 'DELETE'
+    });
+    await handleResponse(response);
+  },
+
   // Court endpoints
   async addCourt(leagueId: string, identifier: string): Promise<Court> {
     const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/courts`, {
@@ -77,6 +84,13 @@ export const api = {
   async getCourts(leagueId: string): Promise<Court[]> {
     const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/courts`);
     return handleResponse<Court[]>(response);
+  },
+
+  async deleteCourt(courtId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/courts/${courtId}`, {
+      method: 'DELETE'
+    });
+    await handleResponse(response);
   },
 
   // Round endpoints

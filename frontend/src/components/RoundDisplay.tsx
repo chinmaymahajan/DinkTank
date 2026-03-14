@@ -221,6 +221,7 @@ const RoundDisplay: React.FC<RoundDisplayProps> = ({
                       )}
                     </ul>
                   </div>
+                  <div className="vs-badge">VS</div>
                   <div className="team">
                     <h4>Team 2</h4>
                     <ul>

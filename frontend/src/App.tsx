@@ -32,52 +32,35 @@ function App() {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
 
-  // Load leagues on mount
-  useEffect(() => {
-    loadLeagues();
-  }, []);
+  useEffect(() => { loadLeagues(); }, []);
 
-  // Load league data when a league is selected
   useEffect(() => {
-    if (selectedLeagueId) {
-      loadLeagueData(selectedLeagueId);
-    }
+    if (selectedLeagueId) loadLeagueData(selectedLeagueId);
   }, [selectedLeagueId]);
 
-  // Load assignments when current round changes
   useEffect(() => {
-    if (currentRound) {
-      loadAssignments(currentRound.id);
-    }
+    if (currentRound) loadAssignments(currentRound.id);
   }, [currentRound]);
 
-  // Auto-dismiss success messages after 3 seconds
   useEffect(() => {
     if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setSuccessMessage(null), 3000);
+      return () => clearTimeout(t);
     }
   }, [successMessage]);
 
-  // Auto-dismiss error messages after 5 seconds
   useEffect(() => {
     if (error) {
-      const timer = setTimeout(() => {
-        setError(null);
-      }, 5000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(t);
     }
   }, [error]);
 
+  const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
+
   const loadLeagues = async () => {
-    try {
-      const data = await api.listLeagues();
-      setLeagues(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load leagues');
-    }
+    try { setLeagues(await api.listLeagues()); }
+    catch (err: any) { setError(err.message || 'Failed to load leagues'); }
   };
 
   const loadLeagueData = async (leagueId: string) => {
@@ -89,12 +72,9 @@ function App() {
         api.getCourts(leagueId),
         api.listRounds(leagueId)
       ]);
-      
       setPlayers(playersData);
       setCourts(courtsData);
       setRounds(roundsData);
-      
-      // Set current round to the most recent one
       if (roundsData.length > 0) {
         setCurrentRound(roundsData[roundsData.length - 1]);
       } else {
@@ -109,18 +89,13 @@ function App() {
   };
 
   const loadAssignments = async (roundId: string) => {
-    try {
-      const data = await api.getAssignments(roundId);
-      setAssignments(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load assignments');
-    }
+    try { setAssignments(await api.getAssignments(roundId)); }
+    catch (err: any) { setError(err.message || 'Failed to load assignments'); }
   };
 
   const handleSelectLeague = async (leagueId: string) => {
     setError(null);
     setSuccessMessage(null);
-
     if (!leagueId) {
       setSelectedLeagueId(null);
       setPlayers([]);
@@ -130,14 +105,11 @@ function App() {
       setAssignments([]);
       return;
     }
-
     try {
       await api.selectLeague(leagueId);
       setSelectedLeagueId(leagueId);
-      setSuccessMessage('League selected successfully');
-    } catch (err: any) {
-      setError(err.message || 'Failed to select league');
-    }
+      setSuccessMessage('League selected');
+    } catch (err: any) { setError(err.message || 'Failed to select league'); }
   };
 
   const handleCreateLeague = async (name: string, format: LeagueFormat) => {
@@ -146,50 +118,62 @@ function App() {
     try {
       const league = await api.createLeague(name, format);
       setLeagues([...leagues, league]);
-      setSuccessMessage(`League "${name}" created successfully`);
-      // Automatically select the newly created league
+      setSuccessMessage(`League "${name}" created`);
       setSelectedLeagueId(league.id);
     } catch (err: any) {
       setError(err.message || 'Failed to create league');
-      throw err; // Re-throw so component can handle it
+      throw err;
     }
   };
 
   const handleAddPlayer = async (name: string) => {
     if (!selectedLeagueId) return;
-    
     setError(null);
     setSuccessMessage(null);
     try {
       const player = await api.addPlayer(selectedLeagueId, name);
       setPlayers([...players, player]);
-      setSuccessMessage(`Player "${name}" added successfully`);
+      setSuccessMessage(`${name} added`);
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to add player';
-      setError(errorMessage);
-      throw err; // Re-throw so component can handle it
+      setError(err.message || 'Failed to add player');
+      throw err;
     }
   };
 
   const handleAddCourt = async (identifier: string) => {
     if (!selectedLeagueId) return;
-    
     setError(null);
     setSuccessMessage(null);
     try {
       const court = await api.addCourt(selectedLeagueId, identifier);
       setCourts([...courts, court]);
-      setSuccessMessage(`Court "${identifier}" added successfully`);
+      setSuccessMessage(`${identifier} added`);
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to add court';
-      setError(errorMessage);
-      throw err; // Re-throw so component can handle it
+      setError(err.message || 'Failed to add court');
+      throw err;
     }
+  };
+
+  const handleRemovePlayer = async (playerId: string) => {
+    setError(null);
+    try {
+      await api.deletePlayer(playerId);
+      setPlayers(players.filter(p => p.id !== playerId));
+      setSuccessMessage('Player removed');
+    } catch (err: any) { setError(err.message || 'Failed to remove player'); }
+  };
+
+  const handleRemoveCourt = async (courtId: string) => {
+    setError(null);
+    try {
+      await api.deleteCourt(courtId);
+      setCourts(courts.filter(c => c.id !== courtId));
+      setSuccessMessage('Court removed');
+    } catch (err: any) { setError(err.message || 'Failed to remove court'); }
   };
 
   const handleGenerateRound = async () => {
     if (!selectedLeagueId) return;
-    
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
@@ -197,21 +181,16 @@ function App() {
       const round = await api.generateRound(selectedLeagueId);
       setRounds([...rounds, round]);
       setCurrentRound(round);
-      setSuccessMessage(`Round ${round.roundNumber} generated successfully`);
+      setSuccessMessage(`Round ${round.roundNumber} generated`);
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to generate round';
-      setError(errorMessage);
-      throw err; // Re-throw so component can handle it
-    } finally {
-      setLoading(false);
-    }
+      setError(err.message || 'Failed to generate round');
+      throw err;
+    } finally { setLoading(false); }
   };
 
   const handleNavigateToRound = (roundNumber: number) => {
     const round = rounds.find(r => r.roundNumber === roundNumber);
-    if (round) {
-      setCurrentRound(round);
-    }
+    if (round) setCurrentRound(round);
   };
 
   const handleUpdateAssignments = async (updates: Array<{
@@ -220,46 +199,36 @@ function App() {
     team2PlayerIds: string[];
   }>) => {
     if (!currentRound) return;
-
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
-
     try {
       const updatedAssignments = await api.updateAssignments(currentRound.id, updates);
       setAssignments(updatedAssignments);
-      setSuccessMessage('Assignments updated successfully');
+      setSuccessMessage('Assignments saved');
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to update assignments';
-      setError(errorMessage);
+      setError(err.message || 'Failed to update assignments');
       throw err;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleSeedMockData = async () => {
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
-
     try {
       const data = await api.seedMockData();
       await loadLeagues();
       setSelectedLeagueId(data.league.id);
       setSuccessMessage(`Mock data created: ${data.players} players, ${data.courts} courts`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to seed mock data');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message || 'Failed to seed mock data'); }
+    finally { setLoading(false); }
   };
 
   const handleClearAllData = async () => {
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
-
     try {
       await api.clearAllData();
       setLeagues([]);
@@ -269,18 +238,17 @@ function App() {
       setRounds([]);
       setCurrentRound(null);
       setAssignments([]);
-      setSuccessMessage('All data cleared successfully');
-    } catch (err: any) {
-      setError(err.message || 'Failed to clear data');
-    } finally {
-      setLoading(false);
-    }
+      setSuccessMessage('All data cleared');
+    } catch (err: any) { setError(err.message || 'Failed to clear data'); }
+    finally { setLoading(false); }
   };
+
+  const formatLabel = (f: string) => f === 'round_robin' ? 'Round Robin' : f;
 
   return (
     <div className={`app ${darkMode ? 'dark' : ''}`}>
       <header>
-        <h1>Pickleball League Manager</h1>
+        <h1>🏓 DinkTank</h1>
         <button
           className="theme-toggle"
           onClick={() => setDarkMode(!darkMode)}
@@ -289,6 +257,31 @@ function App() {
           {darkMode ? '☀️' : '🌙'}
         </button>
       </header>
+
+      {selectedLeague && (
+        <div className="context-bar">
+          <div className="context-item">
+            <span className="context-label">League</span>
+            <span className="context-value">{selectedLeague.name}</span>
+          </div>
+          <div className="context-item">
+            <span className="context-label">Format</span>
+            <span className="context-value">{formatLabel(selectedLeague.format)}</span>
+          </div>
+          <div className="context-item">
+            <span className="context-label">Players</span>
+            <span className="context-value">{players.length}</span>
+          </div>
+          <div className="context-item">
+            <span className="context-label">Courts</span>
+            <span className="context-value">{courts.length}</span>
+          </div>
+          <div className="context-item">
+            <span className="context-label">Rounds</span>
+            <span className="context-value">{rounds.length}</span>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="error-banner">
@@ -304,7 +297,13 @@ function App() {
         </div>
       )}
 
-      {loading && <div className="loading-overlay">Loading...</div>}
+      {loading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner">
+            <span>Loading...</span>
+          </div>
+        </div>
+      )}
 
       <main>
         <DevTools
@@ -323,18 +322,20 @@ function App() {
 
         {selectedLeagueId && (
           <>
-            <section className="management-section">
+            <div className="management-section">
               <PlayerManager
                 leagueId={selectedLeagueId}
                 players={players}
                 onAddPlayer={handleAddPlayer}
+                onRemovePlayer={handleRemovePlayer}
               />
               <CourtManager
                 leagueId={selectedLeagueId}
                 courts={courts}
                 onAddCourt={handleAddCourt}
+                onRemoveCourt={handleRemoveCourt}
               />
-            </section>
+            </div>
 
             <section className="rounds-section">
               <RoundGenerator

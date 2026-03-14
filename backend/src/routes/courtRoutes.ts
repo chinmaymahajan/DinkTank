@@ -63,4 +63,29 @@ router.get('/leagues/:leagueId/courts', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/courts/:courtId
+ * Remove a court
+ */
+router.delete('/courts/:courtId', (req: Request, res: Response) => {
+  try {
+    const { courtId } = req.params;
+    const deleted = courtService.deleteCourt(courtId);
+    if (!deleted) {
+      return res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Court not found' }
+      });
+    }
+    res.json({ message: 'Court deleted' });
+  } catch (error) {
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to delete court',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
 export default router;

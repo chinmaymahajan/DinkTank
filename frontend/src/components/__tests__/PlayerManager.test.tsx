@@ -20,12 +20,14 @@ describe('PlayerManager', () => {
 
   it('should render player list', () => {
     const mockOnAddPlayer = jest.fn();
+    const mockOnRemovePlayer = jest.fn();
     
     render(
       <PlayerManager
         leagueId="league1"
         players={mockPlayers}
         onAddPlayer={mockOnAddPlayer}
+        onRemovePlayer={mockOnRemovePlayer}
       />
     );
 
@@ -36,15 +38,17 @@ describe('PlayerManager', () => {
 
   it('should show message when no players exist', () => {
     const mockOnAddPlayer = jest.fn();
+    const mockOnRemovePlayer = jest.fn();
     
     render(
       <PlayerManager
         leagueId="league1"
         players={[]}
         onAddPlayer={mockOnAddPlayer}
+        onRemovePlayer={mockOnRemovePlayer}
       />
     );
 
-    expect(screen.getByText('No players added yet')).toBeInTheDocument();
+    expect(screen.getByText('No players yet')).toBeInTheDocument();
   });
 });

@@ -1,79 +1,83 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Court } from '../types';
 
 interface CourtManagerProps {
   leagueId: string;
   courts: Court[];
   onAddCourt: (identifier: string) => Promise<void>;
+  onRemoveCourt: (courtId: string) => Promise<void>;
 }
 
-/**
- * CourtManager Component
- * 
- * Displays the list of courts in the league and provides a form to add new courts.
- * Includes validation for court identifiers and displays validation errors.
- * 
- * Requirements: 2.1, 2.3, 2.4
- */
 const CourtManager: React.FC<CourtManagerProps> = ({
   courts,
-  onAddCourt
+  onAddCourt,
+  onRemoveCourt
 }) => {
   const [courtIdentifier, setCourtIdentifier] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldRefocus = useRef(false);
+
+  useEffect(() => {
+    if (!isSubmitting && shouldRefocus.current) {
+      shouldRefocus.current = false;
+      inputRef.current?.focus();
+    }
+  }, [isSubmitting]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    // Client-side validation
-    if (!courtIdentifier.trim()) {
-      setError('Court number cannot be empty');
-      return;
-    }
-
-    if (isNaN(Number(courtIdentifier))) {
-      setError('Please enter a number');
-      return;
-    }
-
+    if (!courtIdentifier.trim()) { setError('Court number cannot be empty'); return; }
+    if (isNaN(Number(courtIdentifier))) { setError('Please enter a number'); return; }
     setIsSubmitting(true);
+    shouldRefocus.current = true;
     try {
       await onAddCourt(`Court ${courtIdentifier.trim()}`);
       setCourtIdentifier('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add court');
-    } finally {
-      setIsSubmitting(false);
-    }
+    } finally { setIsSubmitting(false); }
   };
 
   return (
     <div className="court-manager">
       <h2>Courts</h2>
-      
-      <form onSubmit={handleSubmit} className="add-court-form">
-        <input
-          type="number"
-          value={courtIdentifier}
-          onChange={(e) => setCourtIdentifier(e.target.value)}
-          placeholder="Type court number and press Enter"
-          disabled={isSubmitting}
-          className="court-input"
-          min="1"
-        />
+      <form onSubmit={handleSubmit}>
+        <div className="input-group">
+          <input
+            ref={inputRef}
+            type="number"
+            value={courtIdentifier}
+            onChange={(e) => setCourtIdentifier(e.target.value)}
+            placeholder="Court #"
+            disabled={isSubmitting}
+            min="1"
+          />
+          <button type="submit" disabled={isSubmitting}>Add</button>
+        </div>
       </form>
-
       {error && <div className="error-message">{error}</div>}
-
       <div className="court-list">
         {courts.length === 0 ? (
-          <p>No courts added yet</p>
+          <div className="empty-state">
+            <div className="empty-state-icon">🏟️</div>
+            <div className="empty-state-text">No courts yet</div>
+            <div className="empty-state-hint">Add courts to assign players</div>
+          </div>
         ) : (
           <ul>
             {courts.map((court) => (
-              <li key={court.id}>{court.identifier}</li>
+              <li key={court.id}>
+                <span>{court.identifier}</span>
+                <button
+                  className="remove-btn"
+                  onClick={() => onRemoveCourt(court.id)}
+                  title={`Remove ${court.identifier}`}
+                  aria-label={`Remove ${court.identifier}`}
+                >×</button>
+              </li>
             ))}
           </ul>
         )}
