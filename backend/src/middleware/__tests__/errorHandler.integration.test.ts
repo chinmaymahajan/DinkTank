@@ -48,7 +48,7 @@ describe('errorHandler integration', () => {
 
   it('should handle business logic errors from routes', async () => {
     app.post('/test', (req: Request, res: Response, next: NextFunction) => {
-      next(new Error('Cannot generate round: no players in league'));
+      next(new Error('Cannot generate round: no players in session'));
     });
     app.use(errorHandler);
 
@@ -60,7 +60,7 @@ describe('errorHandler integration', () => {
     expect(response.body).toEqual({
       error: {
         code: 'BUSINESS_LOGIC_ERROR',
-        message: 'Cannot generate round: no players in league'
+        message: 'Cannot generate round: no players in session'
       }
     });
   });

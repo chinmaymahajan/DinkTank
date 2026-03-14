@@ -127,7 +127,7 @@ describe('errorHandler middleware', () => {
 
   describe('Business logic error handling', () => {
     it('should handle no players error', () => {
-      const error = new Error('Cannot generate round: no players in league');
+      const error = new Error('Cannot generate round: no players in session');
 
       errorHandler(error, mockRequest as Request, mockResponse as Response, mockNext);
 
@@ -135,13 +135,13 @@ describe('errorHandler middleware', () => {
       expect(jsonMock).toHaveBeenCalledWith({
         error: {
           code: 'BUSINESS_LOGIC_ERROR',
-          message: 'Cannot generate round: no players in league'
+          message: 'Cannot generate round: no players in session'
         }
       });
     });
 
     it('should handle no courts error', () => {
-      const error = new Error('Cannot generate round: no courts in league');
+      const error = new Error('Cannot generate round: no courts in session');
 
       errorHandler(error, mockRequest as Request, mockResponse as Response, mockNext);
 
@@ -149,7 +149,7 @@ describe('errorHandler middleware', () => {
       expect(jsonMock).toHaveBeenCalledWith({
         error: {
           code: 'BUSINESS_LOGIC_ERROR',
-          message: 'Cannot generate round: no courts in league'
+          message: 'Cannot generate round: no courts in session'
         }
       });
     });

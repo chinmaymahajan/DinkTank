@@ -83,7 +83,7 @@ describe('Round API Routes', () => {
       expect(response.body).toEqual({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Cannot generate round: no players in league'
+          message: 'Cannot generate round: no players in session'
         }
       });
     });
@@ -100,7 +100,7 @@ describe('Round API Routes', () => {
       expect(response.body).toEqual({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Cannot generate round: no courts in league'
+          message: 'Cannot generate round: no courts in session'
         }
       });
     });

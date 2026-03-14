@@ -48,7 +48,8 @@ export class AssignmentService {
       courts: Court[],
       roundId: string,
       playersPerCourt: number = 4,
-      previousAssignments?: Assignment[]
+      previousAssignments?: Assignment[],
+      byeCountMap?: Map<string, number>
     ): Assignment[] {
       // Validate inputs
       if (players.length === 0) {
@@ -59,20 +60,8 @@ export class AssignmentService {
         throw new Error('Cannot generate assignments: no courts available');
       }
 
-      // Determine who was on bye last round so they get priority
-      let previousByePlayerIds: Set<string> = new Set();
-      if (previousAssignments && previousAssignments.length > 0) {
-        const assignedIds = new Set<string>();
-        for (const a of previousAssignments) {
-          a.team1PlayerIds.forEach(id => assignedIds.add(id));
-          a.team2PlayerIds.forEach(id => assignedIds.add(id));
-        }
-        for (const p of players) {
-          if (!assignedIds.has(p.id)) {
-            previousByePlayerIds.add(p.id);
-          }
-        }
-      }
+      // Build bye count map from previous assignments if not provided
+      const effectiveByeCountMap = byeCountMap || new Map<string, number>();
 
       const maxRetries = 10;
       let attempts = 0;
@@ -85,7 +74,7 @@ export class AssignmentService {
           courts,
           roundId,
           playersPerCourt,
-          previousByePlayerIds
+          effectiveByeCountMap
         );
 
         // If no previous assignments, we're done
@@ -95,16 +84,7 @@ export class AssignmentService {
 
         // Check if team compositions are different
         if (!this.areTeamCompositionsIdentical(assignments, previousAssignments)) {
-          // Also verify bye players from last round are now assigned
-          const newAssignedIds = new Set<string>();
-          for (const a of assignments) {
-            a.team1PlayerIds.forEach(id => newAssignedIds.add(id));
-            a.team2PlayerIds.forEach(id => newAssignedIds.add(id));
-          }
-          const byePlayersStillOnBye = [...previousByePlayerIds].filter(id => !newAssignedIds.has(id));
-          if (byePlayersStillOnBye.length === 0) {
-            break;
-          }
+          break;
         }
 
         attempts++;
@@ -119,9 +99,10 @@ export class AssignmentService {
     }
 
     /**
-     * Create assignments, prioritizing players who were on bye last round.
-     * Bye players are placed first to guarantee they play, then remaining
-     * players are shuffled to fill the rest.
+     * Create assignments, prioritizing players with the most byes.
+     * Players are sorted by bye count (descending) so those who have sat out
+     * the most get priority to play. Within the same bye count, players are
+     * shuffled randomly.
      *
      * @private
      */
@@ -130,24 +111,31 @@ export class AssignmentService {
       courts: Court[],
       roundId: string,
       playersPerCourt: number,
-      previousByePlayerIds: Set<string> = new Set()
+      byeCountMap: Map<string, number> = new Map()
     ): Assignment[] {
       const totalSlots = courts.length * playersPerCourt;
 
-      // Split into bye players (priority) and others
-      const byePlayers = players.filter(p => previousByePlayerIds.has(p.id));
-      const otherPlayers = players.filter(p => !previousByePlayerIds.has(p.id));
+      // Group players by bye count
+      const byeCountGroups = new Map<number, Player[]>();
+      for (const p of players) {
+        const count = byeCountMap.get(p.id) || 0;
+        if (!byeCountGroups.has(count)) byeCountGroups.set(count, []);
+        byeCountGroups.get(count)!.push(p);
+      }
 
-      // Shuffle both groups independently
-      const shuffledBye = shuffle([...byePlayers]);
-      const shuffledOthers = shuffle([...otherPlayers]);
+      // Sort groups by bye count descending (most byes first = highest priority)
+      const sortedCounts = [...byeCountGroups.keys()].sort((a, b) => b - a);
 
-      // Bye players go first, then fill with others
-      const ordered = [...shuffledBye, ...shuffledOthers];
+      // Shuffle within each group, then concatenate
+      const ordered: Player[] = [];
+      for (const count of sortedCounts) {
+        ordered.push(...shuffle([...byeCountGroups.get(count)!]));
+      }
+
       // Only take as many as we have court slots for
       const playersToAssign = ordered.slice(0, totalSlots);
 
-      // Shuffle the final list so bye players aren't always on the same courts
+      // Shuffle the final list so high-bye players aren't always on the same courts
       const finalOrder = shuffle([...playersToAssign]);
 
       const assignments: Assignment[] = [];

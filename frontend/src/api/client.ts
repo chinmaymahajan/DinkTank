@@ -122,6 +122,11 @@ export const api = {
     return handleResponse<Assignment[]>(response);
   },
 
+  async getByeCounts(leagueId: string): Promise<Record<string, number>> {
+    const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/bye-counts`);
+    return handleResponse<Record<string, number>>(response);
+  },
+
   async updateAssignments(
     roundId: string,
     assignments: Array<{

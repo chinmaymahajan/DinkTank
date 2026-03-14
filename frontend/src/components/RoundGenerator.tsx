@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 interface RoundGeneratorProps {
   leagueId: string;
   onGenerateRound: () => Promise<void>;
+  currentRoundCount: number;
 }
 
 /**
@@ -15,7 +16,8 @@ interface RoundGeneratorProps {
  */
 const RoundGenerator: React.FC<RoundGeneratorProps> = ({
   leagueId,
-  onGenerateRound
+  onGenerateRound,
+  currentRoundCount
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +40,9 @@ const RoundGenerator: React.FC<RoundGeneratorProps> = ({
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !leagueId}
-        className="generate-button"
+        className="generate-button-hero"
       >
-        {isGenerating ? 'Generating...' : 'Generate New Round'}
+        {isGenerating ? 'Generating...' : currentRoundCount === 0 ? '▶  START ROUND 1' : `▶  START ROUND ${currentRoundCount + 1}`}
       </button>
 
       {error && <div className="error-message">{error}</div>}

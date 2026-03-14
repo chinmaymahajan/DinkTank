@@ -83,7 +83,7 @@ describe('RoundService', () => {
 
       expect(() => {
         roundService.generateRound(leagueId);
-      }).toThrow('Cannot generate round: no players in league');
+      }).toThrow('Cannot generate round: no players in session');
     });
 
     it('should throw error when no courts exist', () => {
@@ -95,7 +95,7 @@ describe('RoundService', () => {
 
       expect(() => {
         roundService.generateRound(leagueId);
-      }).toThrow('Cannot generate round: no courts in league');
+      }).toThrow('Cannot generate round: no courts in session');
     });
 
     it('should generate multiple rounds with different assignments', () => {

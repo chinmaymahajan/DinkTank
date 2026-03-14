@@ -40,13 +40,13 @@ export class RoundService {
       // Validate players exist
       const players = dataStore.getPlayersByLeague(leagueId);
       if (players.length === 0) {
-        throw new Error('Cannot generate round: no players in league');
+        throw new Error('Cannot generate round: no players in session');
       }
 
       // Validate courts exist
       const courts = dataStore.getCourtsByLeague(leagueId);
       if (courts.length === 0) {
-        throw new Error('Cannot generate round: no courts in league');
+        throw new Error('Cannot generate round: no courts in session');
       }
 
       // Determine next round number
@@ -65,20 +65,45 @@ export class RoundService {
 
       dataStore.createRound(round);
 
-      // Get previous round assignments if this is not the first round
+      // Compute bye counts across ALL previous rounds
+      const byeCountMap = new Map<string, number>();
+      const playerIds = new Set(players.map(p => p.id));
+
+      // Initialize all players with 0 byes
+      for (const pid of playerIds) {
+        byeCountMap.set(pid, 0);
+      }
+
+      for (const prevRound of existingRounds) {
+        const roundAssignments = assignmentService.getAssignments(prevRound.id);
+        const assignedInRound = new Set<string>();
+        for (const a of roundAssignments) {
+          a.team1PlayerIds.forEach(id => assignedInRound.add(id));
+          a.team2PlayerIds.forEach(id => assignedInRound.add(id));
+        }
+        // Anyone not assigned in this round gets a bye count increment
+        for (const pid of playerIds) {
+          if (!assignedInRound.has(pid)) {
+            byeCountMap.set(pid, (byeCountMap.get(pid) || 0) + 1);
+          }
+        }
+      }
+
+      // Get previous round assignments for team variety check
       let previousAssignments;
       if (existingRounds.length > 0) {
         const previousRound = existingRounds[existingRounds.length - 1];
         previousAssignments = assignmentService.getAssignments(previousRound.id);
       }
 
-      // Generate assignments for this round
+      // Generate assignments for this round with bye count fairness
       assignmentService.generateAssignments(
         players,
         courts,
         round.id,
         4, // playersPerCourt
-        previousAssignments
+        previousAssignments,
+        byeCountMap
       );
 
       return round;
@@ -111,6 +136,38 @@ export class RoundService {
    */
   listRounds(leagueId: string): Round[] {
     return dataStore.getRoundsByLeague(leagueId);
+  }
+
+  /**
+   * Get bye counts for all players across all rounds in a league
+   * 
+   * @param leagueId - The ID of the league
+   * @returns Map of player ID to bye count
+   */
+  getByeCounts(leagueId: string): Record<string, number> {
+    const players = dataStore.getPlayersByLeague(leagueId);
+    const rounds = dataStore.getRoundsByLeague(leagueId);
+    const byeCounts: Record<string, number> = {};
+
+    for (const p of players) {
+      byeCounts[p.id] = 0;
+    }
+
+    for (const round of rounds) {
+      const roundAssignments = assignmentService.getAssignments(round.id);
+      const assignedInRound = new Set<string>();
+      for (const a of roundAssignments) {
+        a.team1PlayerIds.forEach(id => assignedInRound.add(id));
+        a.team2PlayerIds.forEach(id => assignedInRound.add(id));
+      }
+      for (const p of players) {
+        if (!assignedInRound.has(p.id)) {
+          byeCounts[p.id]++;
+        }
+      }
+    }
+
+    return byeCounts;
   }
 
   /**

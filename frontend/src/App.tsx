@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import {
   LeagueSelector,
@@ -7,7 +7,8 @@ import {
   RoundDisplay,
   RoundNavigator,
   RoundGenerator,
-  DevTools
+  DevTools,
+  TVDisplay
 } from './components';
 import { api } from './api/client';
 import { League, Player, Court, Round, Assignment, LeagueFormat } from './types';
@@ -19,10 +20,41 @@ function App() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [currentRound, setCurrentRound] = useState<Round | null>(null);
+  const [autoActiveRound, setAutoActiveRound] = useState<Round | null>(null);
+  const [autoActiveAssignments, setAutoActiveAssignments] = useState<Assignment[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [byeCounts, setByeCounts] = useState<Record<string, number>>({});
+  const [nextRound, setNextRound] = useState<Round | null>(null);
+  const [nextAssignments, setNextAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'setup' | 'rounds'>('setup');
+  const [tvMode, setTvMode] = useState(false);
+  const [roundDurationMinutes, setRoundDurationMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('roundDurationMinutes');
+    return saved ? Number(saved) : 10;
+  });
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('timerEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [sessionMode, setSessionMode] = useState<'manual' | 'auto'>(() => {
+    const saved = localStorage.getItem('sessionMode');
+    return saved === 'auto' ? 'auto' : 'manual';
+  });
+  const [breakMinutes, setBreakMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('breakMinutes');
+    return saved ? Number(saved) : 2;
+  });
+  const [totalRoundsPlanned, setTotalRoundsPlanned] = useState<number>(() => {
+    const saved = localStorage.getItem('totalRoundsPlanned');
+    return saved ? Number(saved) : 6;
+  });
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -42,6 +74,40 @@ function App() {
     if (currentRound) loadAssignments(currentRound.id);
   }, [currentRound]);
 
+  // Pre-fetch next round assignments for TV break preview (based on auto-active round in auto mode)
+  useEffect(() => {
+    const baseRound = sessionMode === 'auto' && autoActiveRound ? autoActiveRound : currentRound;
+    if (!baseRound || rounds.length === 0) {
+      setNextRound(null);
+      setNextAssignments([]);
+      return;
+    }
+    const baseIndex = rounds.findIndex(r => r.id === baseRound.id);
+    const upcoming = baseIndex >= 0 && baseIndex < rounds.length - 1
+      ? rounds[baseIndex + 1]
+      : null;
+    setNextRound(upcoming);
+    if (upcoming) {
+      api.getAssignments(upcoming.id).then(setNextAssignments).catch(() => setNextAssignments([]));
+    } else {
+      setNextAssignments([]);
+    }
+  }, [currentRound, autoActiveRound, rounds, sessionMode]);
+
+  // Fetch auto-active round assignments for TV mode
+  useEffect(() => {
+    if (sessionMode !== 'auto' || !autoActiveRound) {
+      setAutoActiveAssignments([]);
+      return;
+    }
+    // If viewing the same round, no need to double-fetch
+    if (currentRound && currentRound.id === autoActiveRound.id) {
+      setAutoActiveAssignments([]);
+      return;
+    }
+    api.getAssignments(autoActiveRound.id).then(setAutoActiveAssignments).catch(() => setAutoActiveAssignments([]));
+  }, [autoActiveRound, currentRound, sessionMode]);
+
   useEffect(() => {
     if (successMessage) {
       const t = setTimeout(() => setSuccessMessage(null), 3000);
@@ -56,7 +122,102 @@ function App() {
     }
   }, [error]);
 
+  // Persist round duration
+  useEffect(() => {
+    localStorage.setItem('roundDurationMinutes', String(roundDurationMinutes));
+  }, [roundDurationMinutes]);
+
+  useEffect(() => {
+    localStorage.setItem('timerEnabled', JSON.stringify(timerEnabled));
+  }, [timerEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('sessionMode', sessionMode);
+    if (sessionMode === 'auto') setTimerEnabled(true);
+  }, [sessionMode]);
+
+  useEffect(() => {
+    localStorage.setItem('breakMinutes', String(breakMinutes));
+  }, [breakMinutes]);
+
+  useEffect(() => {
+    localStorage.setItem('totalRoundsPlanned', String(totalRoundsPlanned));
+  }, [totalRoundsPlanned]);
+
+  // Countdown timer tick
+  useEffect(() => {
+    if (timerEndTime === null) {
+      setTimeRemaining(0);
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(0, timerEndTime - Date.now());
+      setTimeRemaining(remaining);
+      if (remaining <= 0 && timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+  }, [timerEndTime]);
+
+  const startTimer = useCallback(() => {
+    if (timerEnabled && roundDurationMinutes > 0) {
+      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+    }
+  }, [timerEnabled, roundDurationMinutes]);
+
+  const formatTime = (ms: number) => {
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const timerActive = timerEndTime !== null && timeRemaining > 0;
+  const timerExpired = timerEndTime !== null && timeRemaining <= 0;
+
+  // Auto-advance: when timer expires in auto mode, start break then next round
+  useEffect(() => {
+    if (sessionMode !== 'auto' || !timerExpired || !autoActiveRound || !selectedLeagueId) return;
+
+    const currentIndex = rounds.findIndex(r => r.id === autoActiveRound.id);
+    const nextAutoRound = currentIndex >= 0 && currentIndex < rounds.length - 1
+      ? rounds[currentIndex + 1]
+      : undefined;
+
+    if (!isOnBreak) {
+      // Round just ended
+      if (!nextAutoRound) return; // Last round, stay expired
+      if (breakMinutes > 0) {
+        // Start break
+        setIsOnBreak(true);
+        setTimerEndTime(Date.now() + breakMinutes * 60 * 1000);
+      } else {
+        // No break, go straight to next round
+        setAutoActiveRound(nextAutoRound);
+        setCurrentRound(nextAutoRound);
+        setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+      }
+    } else {
+      // Break just ended, advance to next round
+      if (!nextAutoRound) { setIsOnBreak(false); return; }
+      setIsOnBreak(false);
+      setAutoActiveRound(nextAutoRound);
+      setCurrentRound(nextAutoRound);
+      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerExpired]);
+
   const selectedLeague = leagues.find(l => l.id === selectedLeagueId);
+  const timerRound = sessionMode === 'auto' && autoActiveRound ? autoActiveRound : currentRound;
+  const isLastRound = timerRound
+    ? rounds.findIndex(r => r.id === timerRound.id) === rounds.length - 1
+    : true;
 
   const loadLeagues = async () => {
     try { setLeagues(await api.listLeagues()); }
@@ -89,7 +250,12 @@ function App() {
   };
 
   const loadAssignments = async (roundId: string) => {
-    try { setAssignments(await api.getAssignments(roundId)); }
+    try {
+      setAssignments(await api.getAssignments(roundId));
+      if (selectedLeagueId) {
+        setByeCounts(await api.getByeCounts(selectedLeagueId));
+      }
+    }
     catch (err: any) { setError(err.message || 'Failed to load assignments'); }
   };
 
@@ -102,6 +268,7 @@ function App() {
       setCourts([]);
       setRounds([]);
       setCurrentRound(null);
+      setAutoActiveRound(null);
       setAssignments([]);
       return;
     }
@@ -119,6 +286,7 @@ function App() {
       const league = await api.createLeague(name, format);
       setLeagues([...leagues, league]);
       setSuccessMessage(`League "${name}" created`);
+      setActiveTab('setup');
       setSelectedLeagueId(league.id);
     } catch (err: any) {
       setError(err.message || 'Failed to create league');
@@ -181,10 +349,36 @@ function App() {
       const round = await api.generateRound(selectedLeagueId);
       setRounds([...rounds, round]);
       setCurrentRound(round);
+      setActiveTab('rounds');
+      startTimer();
       setSuccessMessage(`Round ${round.roundNumber} generated`);
     } catch (err: any) {
       setError(err.message || 'Failed to generate round');
       throw err;
+    } finally { setLoading(false); }
+  };
+
+  const handleStartAutoSession = async () => {
+    if (!selectedLeagueId) return;
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(true);
+    try {
+      for (let i = 0; i < totalRoundsPlanned; i++) {
+        await api.generateRound(selectedLeagueId);
+      }
+      // Fetch all rounds from backend to stay in sync
+      const allRounds = await api.listRounds(selectedLeagueId);
+      const firstAutoRound = allRounds[allRounds.length - totalRoundsPlanned] || allRounds[0];
+      setRounds(allRounds);
+      setCurrentRound(firstAutoRound);
+      setAutoActiveRound(firstAutoRound);
+      setActiveTab('rounds');
+      setIsOnBreak(false);
+      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+      setSuccessMessage(`${totalRoundsPlanned} rounds generated — Round ${firstAutoRound?.roundNumber || 1} started`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to start auto session');
     } finally { setLoading(false); }
   };
 
@@ -237,6 +431,7 @@ function App() {
       setCourts([]);
       setRounds([]);
       setCurrentRound(null);
+      setAutoActiveRound(null);
       setAssignments([]);
       setSuccessMessage('All data cleared');
     } catch (err: any) { setError(err.message || 'Failed to clear data'); }
@@ -311,58 +506,257 @@ function App() {
           onClearData={handleClearAllData}
         />
 
-        <section className="league-section">
+        {!selectedLeagueId ? (
           <LeagueSelector
             leagues={leagues}
             selectedLeagueId={selectedLeagueId}
             onSelect={handleSelectLeague}
             onCreateLeague={handleCreateLeague}
           />
-        </section>
-
-        {selectedLeagueId && (
+        ) : (
           <>
-            <div className="management-section">
-              <PlayerManager
-                leagueId={selectedLeagueId}
-                players={players}
-                onAddPlayer={handleAddPlayer}
-                onRemovePlayer={handleRemovePlayer}
-              />
-              <CourtManager
-                leagueId={selectedLeagueId}
-                courts={courts}
-                onAddCourt={handleAddCourt}
-                onRemoveCourt={handleRemoveCourt}
-              />
+            <div className="tab-nav">
+              <button
+                className={`tab-btn ${activeTab === 'setup' ? 'active' : ''}`}
+                onClick={() => setActiveTab('setup')}
+              >
+                Setup
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'rounds' ? 'active' : ''}`}
+                onClick={() => setActiveTab('rounds')}
+              >
+                Rounds
+              </button>
             </div>
 
-            <section className="rounds-section">
-              <RoundGenerator
-                leagueId={selectedLeagueId}
-                onGenerateRound={handleGenerateRound}
-              />
-              
-              {rounds.length > 0 && currentRound && (
-                <>
-                  <RoundNavigator
-                    currentRound={currentRound.roundNumber}
-                    totalRounds={rounds.length}
-                    onNavigate={handleNavigateToRound}
+            {activeTab === 'setup' && (
+              <>
+                <section className="league-section">
+                  <LeagueSelector
+                    leagues={leagues}
+                    selectedLeagueId={selectedLeagueId}
+                    onSelect={handleSelectLeague}
+                    onCreateLeague={handleCreateLeague}
+                    compact
                   />
-                  <RoundDisplay
-                    round={currentRound}
-                    assignments={assignments}
-                    courts={courts}
+                </section>
+
+                <div className="management-section">
+                  <PlayerManager
+                    leagueId={selectedLeagueId}
                     players={players}
-                    onUpdateAssignments={handleUpdateAssignments}
+                    onAddPlayer={handleAddPlayer}
+                    onRemovePlayer={handleRemovePlayer}
                   />
-                </>
-              )}
-            </section>
+                  <CourtManager
+                    leagueId={selectedLeagueId}
+                    courts={courts}
+                    onAddCourt={handleAddCourt}
+                    onRemoveCourt={handleRemoveCourt}
+                  />
+                  <div className="session-settings-card">
+                    <h2>Settings</h2>
+
+                    <div className="setting-group">
+                      <label className="setting-label">Mode</label>
+                      <div className="mode-options">
+                        <button
+                          className={`mode-option ${sessionMode === 'manual' ? 'active' : ''}`}
+                          onClick={() => setSessionMode('manual')}
+                        >Manual</button>
+                        <button
+                          className={`mode-option ${sessionMode === 'auto' ? 'active' : ''}`}
+                          onClick={() => setSessionMode('auto')}
+                        >Auto</button>
+                      </div>
+                      <p className="setting-hint">
+                        {sessionMode === 'manual'
+                          ? 'You start each round'
+                          : 'Rounds advance when timer ends'}
+                      </p>
+                    </div>
+
+                    <div className="setting-group">
+                      {sessionMode === 'manual' ? (
+                        <>
+                          <label className="duration-toggle">
+                            <input
+                              type="checkbox"
+                              checked={timerEnabled}
+                              onChange={(e) => setTimerEnabled(e.target.checked)}
+                            />
+                            <span className="setting-label">Timer</span>
+                            <span className="optional-badge">optional</span>
+                          </label>
+                          {timerEnabled && (
+                            <div className="duration-input-row">
+                              <input
+                                type="number"
+                                min="1"
+                                max="60"
+                                value={roundDurationMinutes}
+                                onChange={(e) => setRoundDurationMinutes(Math.max(1, Number(e.target.value)))}
+                              />
+                              <span className="duration-unit">min</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <label className="setting-label">Round Duration</label>
+                          <div className="duration-input-row">
+                            <input
+                              type="number"
+                              min="1"
+                              max="60"
+                              value={roundDurationMinutes}
+                              onChange={(e) => setRoundDurationMinutes(Math.max(1, Number(e.target.value)))}
+                            />
+                            <span className="duration-unit">min</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {sessionMode === 'auto' && (
+                      <div className="setting-group">
+                        <label className="setting-label">Break Between Rounds</label>
+                        <div className="duration-input-row">
+                          <input
+                            type="number"
+                            min="0"
+                            max="30"
+                            value={breakMinutes}
+                            onChange={(e) => setBreakMinutes(Math.max(0, Number(e.target.value)))}
+                          />
+                          <span className="duration-unit">min</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {sessionMode === 'auto' && (
+                      <div className="setting-group">
+                        <label className="setting-label">Total Rounds</label>
+                        <div className="duration-input-row">
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={totalRoundsPlanned}
+                            onChange={(e) => setTotalRoundsPlanned(Math.max(1, Number(e.target.value)))}
+                          />
+                          <span className="duration-unit">rounds</span>
+                        </div>
+                        <p className="setting-hint">
+                          Ends around {(() => {
+                            const totalMin = (totalRoundsPlanned * roundDurationMinutes) + ((totalRoundsPlanned - 1) * breakMinutes);
+                            const end = new Date(Date.now() + totalMin * 60000);
+                            return end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                          })()}
+                          {' '}({totalRoundsPlanned * roundDurationMinutes + (totalRoundsPlanned - 1) * breakMinutes} min total)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="start-session-bar">
+                  <div className="start-session-stats">
+                    <span className={`stat ${players.length >= 4 ? 'ready' : ''}`}>👥 {players.length} player{players.length !== 1 ? 's' : ''}</span>
+                    <span className={`stat ${courts.length >= 1 ? 'ready' : ''}`}>🏟️ {courts.length} court{courts.length !== 1 ? 's' : ''}</span>
+                    <span className="stat">{timerEnabled ? `⏱ ${roundDurationMinutes}m rounds` : '⏱ No timer'}</span>
+                  </div>
+                  {players.length < 4 && (
+                    <p className="start-session-hint">Add at least 4 players to start</p>
+                  )}
+                  {players.length >= 4 && courts.length < 1 && (
+                    <p className="start-session-hint">Add at least 1 court to start</p>
+                  )}
+                  <button
+                    className="start-session-btn"
+                    disabled={players.length < 4 || courts.length < 1}
+                    onClick={sessionMode === 'auto' ? handleStartAutoSession : () => setActiveTab('rounds')}
+                  >
+                    Start Session →
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'rounds' && (
+              <section className="rounds-section">
+                {sessionMode === 'manual' && (
+                  <RoundGenerator
+                    leagueId={selectedLeagueId}
+                    onGenerateRound={handleGenerateRound}
+                    currentRoundCount={rounds.length}
+                  />
+                )}
+
+                {(timerActive || timerExpired) && (
+                  <div className={`round-timer ${timerExpired && !isOnBreak && isLastRound ? 'expired' : isOnBreak && timerActive ? 'on-break' : timeRemaining < 60000 && timerActive ? 'warning' : ''}`}>
+                    <span className="timer-display">{timerExpired ? '0:00' : formatTime(timeRemaining)}</span>
+                    {isOnBreak && timerActive && <span className="timer-label">break</span>}
+                    {timerExpired && !isOnBreak && isLastRound && <span className="timer-label">Time's up!</span>}
+                    {timerActive && !isOnBreak && <span className="timer-label">remaining</span>}
+                    <button className="timer-reset-btn" onClick={() => { setTimerEndTime(null); setIsOnBreak(false); }}>✕</button>
+                  </div>
+                )}
+                
+                {rounds.length > 0 && currentRound && (
+                  <>
+                    <div className="rounds-toolbar">
+                      <RoundNavigator
+                        currentRound={currentRound.roundNumber}
+                        totalRounds={rounds.length}
+                        onNavigate={handleNavigateToRound}
+                        liveRound={sessionMode === 'auto' && autoActiveRound ? autoActiveRound.roundNumber : undefined}
+                      />
+                      <button className="tv-mode-btn" onClick={() => setTvMode(true)}>
+                        📺 TV Mode
+                      </button>
+                    </div>
+                    <RoundDisplay
+                      round={currentRound}
+                      assignments={assignments}
+                      courts={courts}
+                      players={players}
+                      onUpdateAssignments={handleUpdateAssignments}
+                      byeCounts={byeCounts}
+                    />
+                  </>
+                )}
+              </section>
+            )}
           </>
         )}
       </main>
+
+      {tvMode && currentRound && selectedLeague && (() => {
+        const tvRound = sessionMode === 'auto' && autoActiveRound ? autoActiveRound : currentRound;
+        const tvAssignments = sessionMode === 'auto' && autoActiveRound && autoActiveRound.id !== currentRound.id && autoActiveAssignments.length > 0
+          ? autoActiveAssignments
+          : assignments;
+        return (
+          <TVDisplay
+            round={tvRound}
+            assignments={tvAssignments}
+            courts={courts}
+            players={players}
+            leagueName={selectedLeague.name}
+            onExit={() => setTvMode(false)}
+            timeRemaining={timeRemaining}
+            timerActive={timerActive}
+            timerExpired={timerExpired}
+            isOnBreak={isOnBreak}
+            isLastRound={isLastRound}
+            formatTime={formatTime}
+            nextRound={nextRound}
+            nextAssignments={nextAssignments}
+          />
+        );
+      })()}
     </div>
   );
 }

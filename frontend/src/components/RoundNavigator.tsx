@@ -4,19 +4,22 @@ interface RoundNavigatorProps {
   currentRound: number;
   totalRounds: number;
   onNavigate: (roundNumber: number) => void;
+  liveRound?: number;
 }
 
 /**
  * RoundNavigator Component
  * 
  * Displays rounds as clickable tabs for quick navigation.
+ * In auto mode, the live round gets a pulsing indicator.
  * 
  * Requirements: 7.1, 7.3
  */
 const RoundNavigator: React.FC<RoundNavigatorProps> = ({
   currentRound,
   totalRounds,
-  onNavigate
+  onNavigate,
+  liveRound
 }) => {
   if (totalRounds === 0) {
     return (
@@ -35,8 +38,9 @@ const RoundNavigator: React.FC<RoundNavigatorProps> = ({
           <button
             key={num}
             onClick={() => onNavigate(num)}
-            className={`round-tab ${num === currentRound ? 'active' : ''}`}
+            className={`round-tab ${num === currentRound ? 'active' : ''} ${liveRound === num ? 'live' : ''}`}
           >
+            {liveRound === num && <span className="live-dot" />}
             Round {num}
           </button>
         ))}

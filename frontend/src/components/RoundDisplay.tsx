@@ -11,6 +11,7 @@ interface RoundDisplayProps {
     team1PlayerIds: string[];
     team2PlayerIds: string[];
   }>) => Promise<void>;
+  byeCounts?: Record<string, number>;
 }
 
 /**
@@ -25,7 +26,8 @@ const RoundDisplay: React.FC<RoundDisplayProps> = ({
   assignments,
   courts,
   players,
-  onUpdateAssignments
+  onUpdateAssignments,
+  byeCounts = {}
 }) => {
   const [editedAssignments, setEditedAssignments] = useState<Assignment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -269,11 +271,18 @@ const RoundDisplay: React.FC<RoundDisplayProps> = ({
       )}
 
       {playersOnBye.length > 0 && (
-        <div className="players-on-bye">
-          <h3>Players on Bye/Waiting</h3>
+        <div className="players-waiting">
+          <h3>🪑 Next In Line</h3>
           <ul>
-            {playersOnBye.map((player) => (
-              <li key={player.id}>{player.name}</li>
+            {[...playersOnBye]
+              .sort((a, b) => (byeCounts[b.id] || 0) - (byeCounts[a.id] || 0))
+              .map((player) => (
+              <li key={player.id}>
+                {player.name}
+                {(byeCounts[player.id] || 0) > 0 && (
+                  <span className="bye-count">({byeCounts[player.id]} {byeCounts[player.id] === 1 ? 'bye' : 'byes'})</span>
+                )}
+              </li>
             ))}
           </ul>
         </div>

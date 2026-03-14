@@ -16,7 +16,7 @@ router.post('/leagues/:leagueId/rounds', (req: Request, res: Response) => {
     res.status(201).json(round);
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('no players in league') || error.message.includes('no courts in league')) {
+      if (error.message.includes('no players in session') || error.message.includes('no courts in session')) {
         return res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
@@ -119,6 +119,26 @@ router.get('/leagues/:leagueId/rounds/:roundNumber', (req: Request, res: Respons
       error: {
         code: 'INTERNAL_ERROR',
         message: 'Failed to get round',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/leagues/:leagueId/bye-counts
+ * Get bye counts for all players across all rounds
+ */
+router.get('/leagues/:leagueId/bye-counts', (req: Request, res: Response) => {
+  try {
+    const { leagueId } = req.params;
+    const byeCounts = roundService.getByeCounts(leagueId);
+    res.json(byeCounts);
+  } catch (error) {
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to get bye counts',
         details: error instanceof Error ? error.message : 'Unknown error'
       }
     });

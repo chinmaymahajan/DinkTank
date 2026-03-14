@@ -1,33 +1,75 @@
-# Pickleball League Manager
+# 🏓 DinkTank
 
-A web application for managing pickleball leagues, automating player assignments, and team formation.
+A web app for running pickleball sessions — round robin, open play, ladders. Handles player assignments, court management, and round progression so you can focus on playing.
+
+## Features
+
+### Session Management
+- Create and resume sessions with named formats (Round Robin)
+- Landing page shows existing sessions with quick resume, or a clean welcome screen for new users
+
+### Two Modes
+
+**Manual Mode** — You control the pace. Generate rounds one at a time, optionally with a countdown timer.
+
+**Auto Mode** — Set the number of rounds, round duration, and break time. DinkTank generates all rounds upfront and auto-advances through them with timers and breaks.
+
+### Player & Court Setup
+- Add/remove players and courts with inline inputs (type + Enter)
+- Typeahead autocomplete for editing player assignments on any court
+- Inline conflict warnings when a player is assigned to multiple courts
+- Fair bye distribution — tracks bye counts across all rounds so everyone sits out equally
+
+### Round Management
+- Round-by-round navigation with clickable tabs
+- In auto mode, tabs show a live indicator (pulsing dot) for the active round while still letting admins browse and edit future rounds
+- Assignments are editable via typeahead inputs with save/discard controls
+- "Next In Line" section shows waiting players with bye counts
+
+### TV Display Mode
+- Full-screen dark overlay optimized for big screens
+- Shows court assignments with large player names
+- Adaptive grid layout (2 columns for ≤4 courts, 3 for more)
+- Timer overlay — countdown during rounds, break timer between rounds
+- During breaks, shows "Up Next" with the next round's assignments
+- Click anywhere or ✕ to exit
+
+### Timer System
+- Optional in manual mode, required in auto mode
+- Configurable round duration and break duration
+- Visual states: normal → amber warning (under 60s) → red pulse (expired)
+- "Time's Up" indicator on the last round only
+
+### Settings
+- Dark mode toggle (persisted)
+- Round duration, break duration, total rounds (all persisted to localStorage)
+- Session validation — requires 4+ players and 1+ court before starting
+
+### Dev Tools
+- Seed mock data (26 players, 6 courts)
+- Clear all data
 
 ## Project Structure
 
 ```
-pickleball-league-manager/
-├── backend/          # Node.js/Express backend API
-│   ├── src/
-│   │   ├── models/   # TypeScript data models
-│   │   └── index.ts  # Backend entry point
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── jest.config.js
-├── frontend/         # React frontend
-│   ├── src/
-│   │   ├── types/    # TypeScript interfaces
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── jest.config.js
-└── package.json      # Root workspace configuration
+dinktank/
+├── backend/           # Node.js/Express API
+│   └── src/
+│       ├── data/      # In-memory data store
+│       ├── middleware/ # Error handling
+│       ├── models/    # TypeScript data models
+│       ├── routes/    # REST endpoints
+│       ├── services/  # Business logic
+│       └── utils/     # Shuffle, validation
+├── frontend/          # React SPA
+│   └── src/
+│       ├── api/       # API client
+│       ├── components/# UI components
+│       └── types/     # TypeScript interfaces
+└── package.json       # Root workspace config
 ```
 
 ## Setup
-
-Install dependencies for all workspaces:
 
 ```bash
 npm install
@@ -36,52 +78,28 @@ npm run install:all
 
 ## Development
 
-Run backend development server:
 ```bash
-npm run dev:backend
-```
-
-Run frontend development server:
-```bash
-npm run dev:frontend
+npm run dev:backend    # Express API on :3001
+npm run dev:frontend   # Vite dev server on :5173
 ```
 
 ## Testing
 
-Run all tests:
 ```bash
-npm test
-```
-
-Run backend tests:
-```bash
-npm run test:backend
-```
-
-Run frontend tests:
-```bash
-npm run test:frontend
+npm test               # All tests
+npm run test:backend   # Backend only
+npm run test:frontend  # Frontend only
 ```
 
 ## Build
 
-Build all projects:
 ```bash
 npm run build
 ```
 
-## Technology Stack
+## Tech Stack
 
 - **Frontend**: React 18, TypeScript, Vite
 - **Backend**: Node.js, Express, TypeScript
-- **Testing**: Jest, fast-check (property-based testing)
+- **Testing**: Jest
 - **Package Management**: npm workspaces
-
-## Data Models
-
-- **League**: Represents a pickleball league
-- **Player**: Individual participant in a league
-- **Court**: Physical court location
-- **Round**: Single iteration of play
-- **Assignment**: Player assignments to courts and teams
-- **ErrorResponse**: Consistent error format
