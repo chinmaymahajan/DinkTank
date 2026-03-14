@@ -1,0 +1,29 @@
+{
+  "name": "pickleball-league-manager",
+  "version": "1.0.0",
+  "description": "Pickleball League Manager - Automate player assignments and team formation",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend",
+    "test": "npm run test --workspaces",
+    "test:backend": "npm run test --workspace=backend",
+    "test:frontend": "npm run test --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend"
+  },
+  "keywords": [
+    "pickleball",
+    "league",
+    "manager",
+    "assignment"
+  ],
+  "author": "",
+  "license": "MIT"
+}

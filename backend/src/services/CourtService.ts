@@ -1,0 +1,59 @@
+import { Court } from '../models/Court';
+import { dataStore } from '../data/DataStore';
+import { validateCourtIdentifier, ValidationResult } from '../utils/validation';
+
+/**
+ * Service for managing courts in leagues
+ * Provides court creation, retrieval, and validation
+ */
+export class CourtService {
+  /**
+   * Add a new court to a league
+   * 
+   * @param leagueId - The ID of the league to add the court to
+   * @param identifier - The identifier for the court
+   * @returns The created court or validation error
+   * @throws Error if validation fails
+   */
+  addCourt(leagueId: string, identifier: string): Court {
+    // Validate court identifier
+    const validation = validateCourtIdentifier(identifier);
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
+    // Create court entity
+    const court: Court = {
+      id: dataStore.generateId(),
+      leagueId,
+      identifier: identifier.trim(),
+      createdAt: new Date()
+    };
+
+    // Store court
+    return dataStore.createCourt(court);
+  }
+
+  /**
+   * Get all courts for a specific league
+   * 
+   * @param leagueId - The ID of the league
+   * @returns Array of courts in the league
+   */
+  getCourts(leagueId: string): Court[] {
+    return dataStore.getCourtsByLeague(leagueId);
+  }
+
+  /**
+   * Validate a court identifier
+   * 
+   * @param identifier - The court identifier to validate
+   * @returns ValidationResult indicating if the identifier is valid
+   */
+  validateCourtIdentifier(identifier: string): ValidationResult {
+    return validateCourtIdentifier(identifier);
+  }
+}
+
+// Export singleton instance
+export const courtService = new CourtService();
