@@ -101,6 +101,15 @@ export const api = {
     return handleResponse<Round>(response);
   },
 
+  async regenerateFutureRounds(leagueId: string, afterRoundNumber: number): Promise<Round[]> {
+    const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/rounds/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ afterRoundNumber })
+    });
+    return handleResponse<Round[]>(response);
+  },
+
   async listRounds(leagueId: string): Promise<Round[]> {
     const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/rounds`);
     return handleResponse<Round[]>(response);
@@ -114,6 +123,16 @@ export const api = {
   async getCurrentRound(leagueId: string): Promise<Round> {
     const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/rounds/current`);
     return handleResponse<Round>(response);
+  },
+
+  async clearRounds(leagueId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/rounds`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      const errorData: ErrorResponse = await response.json();
+      throw new ApiError(errorData.error.code, errorData.error.message, errorData.error.details);
+    }
   },
 
   // Assignment endpoints

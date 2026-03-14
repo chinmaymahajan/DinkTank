@@ -51,6 +51,7 @@ function App() {
     const saved = localStorage.getItem('totalRoundsPlanned');
     return saved ? Number(saved) : 6;
   });
+  const [pendingModeSwitch, setPendingModeSwitch] = useState<'manual' | 'auto' | null>(null);
   const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [isOnBreak, setIsOnBreak] = useState(false);
@@ -76,8 +77,22 @@ function App() {
 
   // Pre-fetch next round assignments for TV break preview (based on auto-active round in auto mode)
   useEffect(() => {
+    if (rounds.length === 0) {
+      setNextRound(null);
+      setNextAssignments([]);
+      return;
+    }
+
+    // During initial break (auto mode, no active round yet), next round is the first round
+    if (sessionMode === 'auto' && !autoActiveRound && isOnBreak) {
+      const firstRound = rounds[0];
+      setNextRound(firstRound);
+      api.getAssignments(firstRound.id).then(setNextAssignments).catch(() => setNextAssignments([]));
+      return;
+    }
+
     const baseRound = sessionMode === 'auto' && autoActiveRound ? autoActiveRound : currentRound;
-    if (!baseRound || rounds.length === 0) {
+    if (!baseRound) {
       setNextRound(null);
       setNextAssignments([]);
       return;
@@ -92,7 +107,7 @@ function App() {
     } else {
       setNextAssignments([]);
     }
-  }, [currentRound, autoActiveRound, rounds, sessionMode]);
+  }, [currentRound, autoActiveRound, rounds, sessionMode, isOnBreak]);
 
   // Fetch auto-active round assignments for TV mode
   useEffect(() => {
@@ -180,35 +195,67 @@ function App() {
   const timerActive = timerEndTime !== null && timeRemaining > 0;
   const timerExpired = timerEndTime !== null && timeRemaining <= 0;
 
+  // Track whether we already handled the current timer expiration
+  const timerHandledRef = useRef(false);
+  const isOnBreakRef = useRef(isOnBreak);
+  const autoActiveRoundRef = useRef(autoActiveRound);
+  const roundsRef = useRef(rounds);
+
+  // Keep refs in sync
+  useEffect(() => { isOnBreakRef.current = isOnBreak; }, [isOnBreak]);
+  useEffect(() => { autoActiveRoundRef.current = autoActiveRound; }, [autoActiveRound]);
+  useEffect(() => { roundsRef.current = rounds; }, [rounds]);
+
+  // Reset handled flag whenever a new timer starts
+  useEffect(() => {
+    if (timerActive) {
+      timerHandledRef.current = false;
+    }
+  }, [timerActive]);
+
   // Auto-advance: when timer expires in auto mode, start break then next round
   useEffect(() => {
-    if (sessionMode !== 'auto' || !timerExpired || !autoActiveRound || !selectedLeagueId) return;
+    if (sessionMode !== 'auto' || !timerExpired || !selectedLeagueId) return;
+    if (timerHandledRef.current) return; // Already handled this expiration
+    timerHandledRef.current = true;
 
-    const currentIndex = rounds.findIndex(r => r.id === autoActiveRound.id);
-    const nextAutoRound = currentIndex >= 0 && currentIndex < rounds.length - 1
-      ? rounds[currentIndex + 1]
-      : undefined;
+    const curRounds = roundsRef.current;
+    const curAutoActive = autoActiveRoundRef.current;
+    const curIsOnBreak = isOnBreakRef.current;
 
-    if (!isOnBreak) {
+    if (curIsOnBreak) {
+      // Break just ended — advance to next round (or first round if session just started)
+      let targetRound: Round | undefined;
+      if (!curAutoActive) {
+        // Initial break before Round 1
+        targetRound = curRounds.length > 0 ? curRounds[0] : undefined;
+      } else {
+        const currentIndex = curRounds.findIndex(r => r.id === curAutoActive.id);
+        targetRound = currentIndex >= 0 && currentIndex < curRounds.length - 1
+          ? curRounds[currentIndex + 1]
+          : undefined;
+      }
+      if (!targetRound) { setIsOnBreak(false); return; }
+      setIsOnBreak(false);
+      setAutoActiveRound(targetRound);
+      setCurrentRound(targetRound);
+      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+    } else {
       // Round just ended
+      if (!curAutoActive) return;
+      const currentIndex = curRounds.findIndex(r => r.id === curAutoActive.id);
+      const nextAutoRound = currentIndex >= 0 && currentIndex < curRounds.length - 1
+        ? curRounds[currentIndex + 1]
+        : undefined;
       if (!nextAutoRound) return; // Last round, stay expired
       if (breakMinutes > 0) {
-        // Start break
         setIsOnBreak(true);
         setTimerEndTime(Date.now() + breakMinutes * 60 * 1000);
       } else {
-        // No break, go straight to next round
         setAutoActiveRound(nextAutoRound);
         setCurrentRound(nextAutoRound);
         setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
       }
-    } else {
-      // Break just ended, advance to next round
-      if (!nextAutoRound) { setIsOnBreak(false); return; }
-      setIsOnBreak(false);
-      setAutoActiveRound(nextAutoRound);
-      setCurrentRound(nextAutoRound);
-      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timerExpired]);
@@ -227,6 +274,7 @@ function App() {
   const loadLeagueData = async (leagueId: string) => {
     setLoading(true);
     setError(null);
+    setPendingModeSwitch(null);
     try {
       const [playersData, courtsData, roundsData] = await Promise.all([
         api.getPlayers(leagueId),
@@ -270,6 +318,7 @@ function App() {
       setCurrentRound(null);
       setAutoActiveRound(null);
       setAssignments([]);
+      setPendingModeSwitch(null);
       return;
     }
     try {
@@ -294,6 +343,17 @@ function App() {
     }
   };
 
+  const regenerateIfAutoSession = async () => {
+    if (sessionMode !== 'auto' || !selectedLeagueId || !autoActiveRound || rounds.length === 0) return;
+    try {
+      const updatedRounds = await api.regenerateFutureRounds(selectedLeagueId, autoActiveRound.roundNumber);
+      setRounds(updatedRounds);
+      setSuccessMessage('Future rounds regenerated with updated roster');
+    } catch (err: any) {
+      setError(err.message || 'Failed to regenerate future rounds');
+    }
+  };
+
   const handleAddPlayer = async (name: string) => {
     if (!selectedLeagueId) return;
     setError(null);
@@ -302,6 +362,7 @@ function App() {
       const player = await api.addPlayer(selectedLeagueId, name);
       setPlayers([...players, player]);
       setSuccessMessage(`${name} added`);
+      await regenerateIfAutoSession();
     } catch (err: any) {
       setError(err.message || 'Failed to add player');
       throw err;
@@ -316,6 +377,7 @@ function App() {
       const court = await api.addCourt(selectedLeagueId, identifier);
       setCourts([...courts, court]);
       setSuccessMessage(`${identifier} added`);
+      await regenerateIfAutoSession();
     } catch (err: any) {
       setError(err.message || 'Failed to add court');
       throw err;
@@ -328,6 +390,7 @@ function App() {
       await api.deletePlayer(playerId);
       setPlayers(players.filter(p => p.id !== playerId));
       setSuccessMessage('Player removed');
+      await regenerateIfAutoSession();
     } catch (err: any) { setError(err.message || 'Failed to remove player'); }
   };
 
@@ -337,6 +400,7 @@ function App() {
       await api.deleteCourt(courtId);
       setCourts(courts.filter(c => c.id !== courtId));
       setSuccessMessage('Court removed');
+      await regenerateIfAutoSession();
     } catch (err: any) { setError(err.message || 'Failed to remove court'); }
   };
 
@@ -372,11 +436,19 @@ function App() {
       const firstAutoRound = allRounds[allRounds.length - totalRoundsPlanned] || allRounds[0];
       setRounds(allRounds);
       setCurrentRound(firstAutoRound);
-      setAutoActiveRound(firstAutoRound);
+      setAutoActiveRound(null); // No active round yet — session starts with a break
       setActiveTab('rounds');
-      setIsOnBreak(false);
-      setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
-      setSuccessMessage(`${totalRoundsPlanned} rounds generated — Round ${firstAutoRound?.roundNumber || 1} started`);
+      // Start with an initial break so TV shows "Up Next — Round 1"
+      setIsOnBreak(true);
+      if (breakMinutes > 0) {
+        setTimerEndTime(Date.now() + breakMinutes * 60 * 1000);
+      } else {
+        // No break configured — start Round 1 immediately
+        setAutoActiveRound(firstAutoRound);
+        setTimerEndTime(Date.now() + roundDurationMinutes * 60 * 1000);
+        setIsOnBreak(false);
+      }
+      setSuccessMessage(`${totalRoundsPlanned} rounds generated — session starting`);
     } catch (err: any) {
       setError(err.message || 'Failed to start auto session');
     } finally { setLoading(false); }
@@ -433,12 +505,44 @@ function App() {
       setCurrentRound(null);
       setAutoActiveRound(null);
       setAssignments([]);
+      setPendingModeSwitch(null);
       setSuccessMessage('All data cleared');
     } catch (err: any) { setError(err.message || 'Failed to clear data'); }
     finally { setLoading(false); }
   };
 
   const formatLabel = (f: string) => f === 'round_robin' ? 'Round Robin' : f;
+
+  const handleModeSwitch = (newMode: 'manual' | 'auto') => {
+    if (newMode === sessionMode) return;
+    if (rounds.length > 0) {
+      setPendingModeSwitch(newMode);
+    } else {
+      setSessionMode(newMode);
+    }
+  };
+
+  const confirmModeSwitch = async () => {
+    if (!pendingModeSwitch || !selectedLeagueId) return;
+    try {
+      await api.clearRounds(selectedLeagueId);
+      setRounds([]);
+      setCurrentRound(null);
+      setAutoActiveRound(null);
+      setAssignments([]);
+      setAutoActiveAssignments([]);
+      setNextRound(null);
+      setNextAssignments([]);
+      setByeCounts({});
+      setTimerEndTime(null);
+      setIsOnBreak(false);
+      setSessionMode(pendingModeSwitch);
+      setPendingModeSwitch(null);
+      setSuccessMessage(`Switched to ${pendingModeSwitch} mode — session reset`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to switch mode');
+    }
+  };
 
   return (
     <div className={`app ${darkMode ? 'dark' : ''}`}>
@@ -563,13 +667,22 @@ function App() {
                       <div className="mode-options">
                         <button
                           className={`mode-option ${sessionMode === 'manual' ? 'active' : ''}`}
-                          onClick={() => setSessionMode('manual')}
+                          onClick={() => handleModeSwitch('manual')}
                         >Manual</button>
                         <button
                           className={`mode-option ${sessionMode === 'auto' ? 'active' : ''}`}
-                          onClick={() => setSessionMode('auto')}
+                          onClick={() => handleModeSwitch('auto')}
                         >Auto</button>
                       </div>
+                      {pendingModeSwitch && (
+                        <div className="mode-switch-warning">
+                          <p>Switching to {pendingModeSwitch} mode will clear all current rounds.</p>
+                          <div className="mode-switch-actions">
+                            <button className="mode-switch-confirm" onClick={confirmModeSwitch}>Switch &amp; Reset</button>
+                            <button className="mode-switch-cancel" onClick={() => setPendingModeSwitch(null)}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
                       <p className="setting-hint">
                         {sessionMode === 'manual'
                           ? 'You start each round'
@@ -676,9 +789,9 @@ function App() {
                   <button
                     className="start-session-btn"
                     disabled={players.length < 4 || courts.length < 1}
-                    onClick={sessionMode === 'auto' ? handleStartAutoSession : () => setActiveTab('rounds')}
+                    onClick={sessionMode === 'auto' && rounds.length === 0 ? handleStartAutoSession : () => setActiveTab('rounds')}
                   >
-                    Start Session →
+                    {rounds.length > 0 ? 'Go to Rounds →' : 'Start Session →'}
                   </button>
                 </div>
               </>

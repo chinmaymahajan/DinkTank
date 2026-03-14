@@ -171,6 +171,38 @@ export class RoundService {
   }
 
   /**
+   * Regenerate all rounds after a given round number.
+   * Deletes future rounds and their assignments, then re-generates them
+   * with the current player/court roster and fair bye distribution.
+   *
+   * @param leagueId - The league ID
+   * @param afterRoundNumber - Keep this round and all before it; regenerate everything after
+   * @returns The updated list of all rounds
+   */
+  regenerateFutureRounds(leagueId: string, afterRoundNumber: number): Round[] {
+    const allRounds = dataStore.getRoundsByLeague(leagueId);
+    const roundsToKeep = allRounds.filter(r => r.roundNumber <= afterRoundNumber);
+    const roundsToDelete = allRounds.filter(r => r.roundNumber > afterRoundNumber);
+    const numToRegenerate = roundsToDelete.length;
+
+    // Delete future rounds and their assignments
+    for (const round of roundsToDelete) {
+      const assignments = dataStore.getAssignmentsByRound(round.id);
+      for (const a of assignments) {
+        dataStore.deleteAssignment(a.id);
+      }
+      dataStore.deleteRound(round.id);
+    }
+
+    // Regenerate that many rounds using the current roster
+    for (let i = 0; i < numToRegenerate; i++) {
+      this.generateRound(leagueId);
+    }
+
+    return dataStore.getRoundsByLeague(leagueId);
+  }
+
+  /**
    * Get the most recent round for a league
    * 
    * @param leagueId - The ID of the league
@@ -186,6 +218,22 @@ export class RoundService {
     
     // Rounds are already sorted by round number, so get the last one
     return rounds[rounds.length - 1];
+  }
+
+  /**
+   * Clear all rounds and their assignments for a league
+   * 
+   * @param leagueId - The ID of the league
+   */
+  clearRounds(leagueId: string): void {
+    const allRounds = dataStore.getRoundsByLeague(leagueId);
+    for (const round of allRounds) {
+      const assignments = dataStore.getAssignmentsByRound(round.id);
+      for (const a of assignments) {
+        dataStore.deleteAssignment(a.id);
+      }
+      dataStore.deleteRound(round.id);
+    }
   }
 }
 

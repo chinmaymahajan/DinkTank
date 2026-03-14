@@ -146,6 +146,67 @@ router.get('/leagues/:leagueId/bye-counts', (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/leagues/:leagueId/rounds/regenerate
+ * Regenerate all rounds after a given round number with current roster
+ */
+router.post('/leagues/:leagueId/rounds/regenerate', (req: Request, res: Response) => {
+  try {
+    const { leagueId } = req.params;
+    const { afterRoundNumber } = req.body;
+
+    if (typeof afterRoundNumber !== 'number' || afterRoundNumber < 0) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'afterRoundNumber must be a non-negative number'
+        }
+      });
+    }
+
+    const rounds = roundService.regenerateFutureRounds(leagueId, afterRoundNumber);
+    res.json(rounds);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('no players in session') || error.message.includes('no courts in session')) {
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: error.message
+          }
+        });
+      }
+    }
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to regenerate rounds',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
+/**
+ * DELETE /api/leagues/:leagueId/rounds
+ * Clear all rounds for a league
+ */
+router.delete('/leagues/:leagueId/rounds', (req: Request, res: Response) => {
+  try {
+    const { leagueId } = req.params;
+    roundService.clearRounds(leagueId);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to clear rounds',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
+/**
  * GET /api/rounds/:roundId/assignments
  * Get all assignments for a specific round
  */
