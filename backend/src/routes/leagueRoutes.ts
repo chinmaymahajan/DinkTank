@@ -127,4 +127,32 @@ router.post('/leagues/:id/select', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * DELETE /api/leagues/:id
+ * Delete a league and all associated data
+ */
+router.delete('/leagues/:id', (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    leagueService.deleteLeague(id);
+    res.json({ message: 'League deleted successfully' });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'League not found') {
+      return res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: 'League not found'
+        }
+      });
+    }
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to delete league',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }
+    });
+  }
+});
+
 export default router;

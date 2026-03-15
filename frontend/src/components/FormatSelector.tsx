@@ -39,7 +39,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
 
   return (
     <div className="format-selector">
-      <label htmlFor="format-select">League Format:</label>
+      <label htmlFor="format-select">Session Format:</label>
       <select
         id="format-select"
         value={selectedFormat}

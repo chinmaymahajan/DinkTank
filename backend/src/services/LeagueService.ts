@@ -76,6 +76,45 @@ export class LeagueService {
   clearSelection(): void {
     this.selectedLeagueId = null;
   }
+  /**
+   * Delete a league and all its associated data (players, courts, rounds, assignments)
+   *
+   * @param leagueId - The ID of the league to delete
+   * @throws Error if league not found
+   */
+  deleteLeague(leagueId: string): void {
+    const league = dataStore.getLeague(leagueId);
+    if (!league) {
+      throw new Error('League not found');
+    }
+
+    // Delete all assignments for all rounds in this league
+    const rounds = dataStore.getRoundsByLeague(leagueId);
+    for (const round of rounds) {
+      const assignments = dataStore.getAssignmentsByRound(round.id);
+      for (const a of assignments) {
+        dataStore.deleteAssignment(a.id);
+      }
+      dataStore.deleteRound(round.id);
+    }
+
+    // Delete all players and courts
+    const players = dataStore.getPlayersByLeague(leagueId);
+    for (const p of players) {
+      dataStore.deletePlayer(p.id);
+    }
+    const courts = dataStore.getCourtsByLeague(leagueId);
+    for (const c of courts) {
+      dataStore.deleteCourt(c.id);
+    }
+
+    // Clear selection if this was the selected league
+    if (this.selectedLeagueId === leagueId) {
+      this.selectedLeagueId = null;
+    }
+
+    dataStore.deleteLeague(leagueId);
+  }
 }
 
 // Export singleton instance

@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Court } from '../types';
+import CourtIcon from './CourtIcon';
 
 interface CourtManagerProps {
   leagueId: string;
   courts: Court[];
   onAddCourt: (identifier: string) => Promise<void>;
   onRemoveCourt: (courtId: string) => Promise<void>;
+  inputId?: string;
 }
 
 const CourtManager: React.FC<CourtManagerProps> = ({
   courts,
   onAddCourt,
-  onRemoveCourt
+  onRemoveCourt,
+  inputId
 }) => {
   const [courtIdentifier, setCourtIdentifier] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,7 @@ const CourtManager: React.FC<CourtManagerProps> = ({
     setError(null);
     if (!courtIdentifier.trim()) { setError('Court number cannot be empty'); return; }
     if (isNaN(Number(courtIdentifier))) { setError('Please enter a number'); return; }
+    if (courts.some(c => c.identifier === `Court ${courtIdentifier.trim()}`)) { setError(`Court ${courtIdentifier.trim()} already exists`); return; }
     setIsSubmitting(true);
     shouldRefocus.current = true;
     try {
@@ -48,6 +52,7 @@ const CourtManager: React.FC<CourtManagerProps> = ({
         <div className="input-group">
           <input
             ref={inputRef}
+            id={inputId}
             type="number"
             value={courtIdentifier}
             onChange={(e) => setCourtIdentifier(e.target.value)}
@@ -62,7 +67,7 @@ const CourtManager: React.FC<CourtManagerProps> = ({
       <div className="court-list">
         {courts.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🏟️</div>
+            <div className="empty-state-icon"><CourtIcon size={48} /></div>
             <div className="empty-state-text">No courts yet</div>
             <div className="empty-state-hint">Add courts to assign players</div>
           </div>

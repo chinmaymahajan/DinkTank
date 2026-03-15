@@ -12,6 +12,7 @@ interface RoundDisplayProps {
     team2PlayerIds: string[];
   }>) => Promise<void>;
   byeCounts?: Record<string, number>;
+  hideByePlayers?: boolean;
 }
 
 /**
@@ -27,7 +28,8 @@ const RoundDisplay: React.FC<RoundDisplayProps> = ({
   courts,
   players,
   onUpdateAssignments,
-  byeCounts = {}
+  byeCounts = {},
+  hideByePlayers = false
 }) => {
   const [editedAssignments, setEditedAssignments] = useState<Assignment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -270,7 +272,7 @@ const RoundDisplay: React.FC<RoundDisplayProps> = ({
         </div>
       )}
 
-      {playersOnBye.length > 0 && (
+      {playersOnBye.length > 0 && !hideByePlayers && (
         <div className="players-waiting">
           <h3>🪑 Next In Line</h3>
           <ul>

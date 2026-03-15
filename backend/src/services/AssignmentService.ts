@@ -113,7 +113,10 @@ export class AssignmentService {
       playersPerCourt: number,
       byeCountMap: Map<string, number> = new Map()
     ): Assignment[] {
-      const totalSlots = courts.length * playersPerCourt;
+      const playersNeeded = Math.min(players.length, courts.length * playersPerCourt);
+      // Number of full courts we can fill
+      const fullCourts = Math.floor(playersNeeded / playersPerCourt);
+      const slotsToFill = fullCourts * playersPerCourt;
 
       // Group players by bye count
       const byeCountGroups = new Map<number, Player[]>();
@@ -123,7 +126,7 @@ export class AssignmentService {
         byeCountGroups.get(count)!.push(p);
       }
 
-      // Sort groups by bye count descending (most byes first = highest priority)
+      // Sort groups by bye count descending (most byes first = highest priority to play)
       const sortedCounts = [...byeCountGroups.keys()].sort((a, b) => b - a);
 
       // Shuffle within each group, then concatenate
@@ -132,16 +135,19 @@ export class AssignmentService {
         ordered.push(...shuffle([...byeCountGroups.get(count)!]));
       }
 
-      // Only take as many as we have court slots for
-      const playersToAssign = ordered.slice(0, totalSlots);
+      // Take exactly enough players to fill full courts — priority players first
+      const playersToAssign = ordered.slice(0, slotsToFill);
 
-      // Shuffle the final list so high-bye players aren't always on the same courts
+      // Shuffle the selected players so high-bye players aren't always on the same courts
       const finalOrder = shuffle([...playersToAssign]);
+
+      // Shuffle courts for variety
+      const shuffledCourts = shuffle([...courts]);
 
       const assignments: Assignment[] = [];
       let playerIndex = 0;
 
-      for (const court of courts) {
+      for (const court of shuffledCourts) {
         const courtPlayers = finalOrder.slice(
           playerIndex,
           playerIndex + playersPerCourt

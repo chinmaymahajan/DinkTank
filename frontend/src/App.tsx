@@ -12,6 +12,7 @@ import {
 } from './components';
 import { api } from './api/client';
 import { League, Player, Court, Round, Assignment, LeagueFormat } from './types';
+import CourtIcon from './components/CourtIcon';
 
 function App() {
   const [leagues, setLeagues] = useState<League[]>([]);
@@ -61,6 +62,16 @@ function App() {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+
+  // Per-league session state cache — preserves timer/break state when switching leagues
+  interface LeagueSessionState {
+    autoActiveRound: Round | null;
+    timerEndTime: number | null;
+    isOnBreak: boolean;
+    timerHidden: boolean;
+    activeTab: 'setup' | 'rounds';
+  }
+  const leagueSessionCache = useRef<Map<string, LeagueSessionState>>(new Map());
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
@@ -312,6 +323,19 @@ function App() {
   const handleSelectLeague = async (leagueId: string) => {
     setError(null);
     setSuccessMessage(null);
+    setTvMode(false);
+
+    // Save current league's session state before switching
+    if (selectedLeagueId) {
+      leagueSessionCache.current.set(selectedLeagueId, {
+        autoActiveRound,
+        timerEndTime,
+        isOnBreak,
+        timerHidden,
+        activeTab,
+      });
+    }
+
     if (!leagueId) {
       setSelectedLeagueId(null);
       setPlayers([]);
@@ -320,13 +344,49 @@ function App() {
       setCurrentRound(null);
       setAutoActiveRound(null);
       setAssignments([]);
+      setAutoActiveAssignments([]);
+      setNextRound(null);
+      setNextAssignments([]);
+      setByeCounts({});
+      setTimerEndTime(null);
+      setIsOnBreak(false);
       setPendingModeSwitch(null);
       return;
     }
+
+    // Restore cached session state if switching back to a known league
+    const cached = leagueSessionCache.current.get(leagueId);
+    if (cached) {
+      // If the cached timer has expired while we were away, fast-forward to final state
+      if (cached.timerEndTime !== null && cached.timerEndTime <= Date.now()) {
+        setAutoActiveRound(cached.autoActiveRound);
+        setTimerEndTime(null);
+        setIsOnBreak(false);
+        setTimerHidden(cached.timerHidden);
+        setActiveTab(cached.activeTab);
+      } else {
+        setAutoActiveRound(cached.autoActiveRound);
+        setTimerEndTime(cached.timerEndTime);
+        setIsOnBreak(cached.isOnBreak);
+        setTimerHidden(cached.timerHidden);
+        setActiveTab(cached.activeTab);
+      }
+    } else {
+      setAutoActiveRound(null);
+      setTimerEndTime(null);
+      setIsOnBreak(false);
+      setTimerHidden(false);
+      setActiveTab('setup');
+    }
+    setAutoActiveAssignments([]);
+    setNextRound(null);
+    setNextAssignments([]);
+    setByeCounts({});
+    setPendingModeSwitch(null);
+
     try {
       await api.selectLeague(leagueId);
       setSelectedLeagueId(leagueId);
-      setSuccessMessage('League selected');
     } catch (err: any) { setError(err.message || 'Failed to select league'); }
   };
 
@@ -341,6 +401,30 @@ function App() {
       setSelectedLeagueId(league.id);
     } catch (err: any) {
       setError(err.message || 'Failed to create league');
+      throw err;
+    }
+  };
+
+  const handleDeleteLeague = async (leagueId: string) => {
+    setError(null);
+    try {
+      await api.deleteLeague(leagueId);
+      leagueSessionCache.current.delete(leagueId);
+      setLeagues(leagues.filter(l => l.id !== leagueId));
+      if (selectedLeagueId === leagueId) {
+        setSelectedLeagueId(null);
+        setPlayers([]);
+        setCourts([]);
+        setRounds([]);
+        setCurrentRound(null);
+        setAutoActiveRound(null);
+        setAssignments([]);
+        setTimerEndTime(null);
+        setIsOnBreak(false);
+      }
+      setSuccessMessage('Session deleted');
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete session');
       throw err;
     }
   };
@@ -369,6 +453,22 @@ function App() {
       setError(err.message || 'Failed to add player');
       throw err;
     }
+  };
+
+  const handleImportPlayers = async (names: string[]) => {
+    if (!selectedLeagueId) return;
+    setError(null);
+    setSuccessMessage(null);
+    const added: Player[] = [];
+    for (const name of names) {
+      try {
+        const player = await api.addPlayer(selectedLeagueId, name);
+        added.push(player);
+      } catch { /* skip duplicates */ }
+    }
+    setPlayers(prev => [...prev, ...added]);
+    setSuccessMessage(`${added.length} player${added.length !== 1 ? 's' : ''} imported`);
+    await regenerateIfAutoSession();
   };
 
   const handleAddCourt = async (identifier: string) => {
@@ -547,6 +647,8 @@ function App() {
     }
   };
 
+
+
   return (
     <div className={`app ${darkMode ? 'dark' : ''}`}>
       <header>
@@ -562,10 +664,11 @@ function App() {
 
       {selectedLeague && (
         <div className="context-bar">
-          <div className="context-item">
+          <button className="context-item context-item-link" onClick={() => handleSelectLeague('')}>
             <span className="context-label">League</span>
             <span className="context-value">{selectedLeague.name}</span>
-          </div>
+            <span className="context-change">Change</span>
+          </button>
           <div className="context-item">
             <span className="context-label">Format</span>
             <span className="context-value">{formatLabel(selectedLeague.format)}</span>
@@ -619,6 +722,7 @@ function App() {
             selectedLeagueId={selectedLeagueId}
             onSelect={handleSelectLeague}
             onCreateLeague={handleCreateLeague}
+            onDeleteLeague={handleDeleteLeague}
           />
         ) : (
           <>
@@ -672,13 +776,16 @@ function App() {
                     leagueId={selectedLeagueId}
                     players={players}
                     onAddPlayer={handleAddPlayer}
+                    onImportPlayers={handleImportPlayers}
                     onRemovePlayer={handleRemovePlayer}
+                    nextInputId="court-input"
                   />
                   <CourtManager
                     leagueId={selectedLeagueId}
                     courts={courts}
                     onAddCourt={handleAddCourt}
                     onRemoveCourt={handleRemoveCourt}
+                    inputId="court-input"
                   />
                   <div className="session-settings-card">
                     <h2>Settings</h2>
@@ -797,8 +904,8 @@ function App() {
 
                 <div className="start-session-bar">
                   <div className="start-session-stats">
-                    <span className={`stat ${players.length >= 4 ? 'ready' : ''}`}>👥 {players.length} player{players.length !== 1 ? 's' : ''}</span>
-                    <span className={`stat ${courts.length >= 1 ? 'ready' : ''}`}>🏟️ {courts.length} court{courts.length !== 1 ? 's' : ''}</span>
+                    <span className={`stat ${players.length >= 4 ? 'ready' : ''}`}>🧍 {players.length} player{players.length !== 1 ? 's' : ''}</span>
+                    <span className={`stat ${courts.length >= 1 ? 'ready' : ''}`}><CourtIcon size={16} /> {courts.length} court{courts.length !== 1 ? 's' : ''}</span>
                     <span className="stat">{timerEnabled ? `⏱ ${roundDurationMinutes}m rounds` : '⏱ No timer'}</span>
                   </div>
                   {players.length < 4 && (
@@ -807,6 +914,7 @@ function App() {
                   {players.length >= 4 && courts.length < 1 && (
                     <p className="start-session-hint">Add at least 1 court to start</p>
                   )}
+                  <div className="start-session-actions">
                   <button
                     className="start-session-btn"
                     disabled={players.length < 4 || courts.length < 1}
@@ -814,6 +922,29 @@ function App() {
                   >
                     {rounds.length > 0 ? 'Go to Rounds →' : 'Start Session →'}
                   </button>
+                  {rounds.length > 0 && (
+                    <button
+                      className="new-session-btn"
+                      onClick={async () => {
+                        if (!selectedLeagueId) return;
+                        try {
+                          await api.clearRounds(selectedLeagueId);
+                          setRounds([]);
+                          setAssignments([]);
+                          setAutoActiveRound(null);
+                          setTimerEndTime(null);
+                          setIsOnBreak(false);
+                          setTimerHidden(false);
+                          setSuccessMessage('Session reset — players and courts kept');
+                        } catch (err: any) {
+                          setError(err.message || 'Failed to reset session');
+                        }
+                      }}
+                    >
+                      🔄 New Session
+                    </button>
+                  )}
+                  </div>
                 </div>
               </>
             )}
@@ -828,11 +959,22 @@ function App() {
                   />
                 )}
 
+                {sessionMode === 'auto' && rounds.length === 0 && (
+                  <div className="auto-empty-state">
+                    <p className="auto-empty-title">No rounds yet</p>
+                    <p className="auto-empty-detail">Head back to Setup to configure and start your auto session.</p>
+                    <button className="auto-empty-btn" onClick={() => setActiveTab('setup')}>
+                      ← Go to Setup
+                    </button>
+                  </div>
+                )}
+
                 {(timerActive || timerExpired) && !timerHidden && (
                   <div className={`round-timer ${timerExpired && !isOnBreak && isLastRound ? 'expired' : isOnBreak && timerActive ? 'on-break' : timeRemaining < 60000 && timerActive ? 'warning' : ''}`}>
                     <span className="timer-display">{timerExpired ? '0:00' : formatTime(timeRemaining)}</span>
                     {isOnBreak && timerActive && <span className="timer-label">break</span>}
                     {timerExpired && !isOnBreak && isLastRound && <span className="timer-label">Time's up!</span>}
+                    {timerExpired && !isOnBreak && !isLastRound && sessionMode === 'auto' && <span className="timer-label">advancing…</span>}
                     {timerActive && !isOnBreak && <span className="timer-label">remaining</span>}
                     <button className="timer-reset-btn" onClick={() => setTimerHidden(true)} title="Hide timer">👁</button>
                   </div>
@@ -864,6 +1006,7 @@ function App() {
                       players={players}
                       onUpdateAssignments={handleUpdateAssignments}
                       byeCounts={byeCounts}
+                      hideByePlayers={false}
                     />
                   </>
                 )}

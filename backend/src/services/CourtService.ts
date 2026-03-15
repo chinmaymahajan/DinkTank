@@ -22,6 +22,12 @@ export class CourtService {
       throw new Error(validation.error);
     }
 
+    // Check for duplicate court identifier in this league
+    const existing = dataStore.getCourtsByLeague(leagueId);
+    if (existing.some(c => c.identifier === identifier.trim())) {
+      throw new Error(`Court "${identifier.trim()}" already exists`);
+    }
+
     // Create court entity
     const court: Court = {
       id: dataStore.generateId(),

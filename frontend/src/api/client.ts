@@ -49,6 +49,13 @@ export const api = {
     await handleResponse(response);
   },
 
+  async deleteLeague(leagueId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}`, {
+      method: 'DELETE'
+    });
+    await handleResponse(response);
+  },
+
   // Player endpoints
   async addPlayer(leagueId: string, name: string): Promise<Player> {
     const response = await fetch(`${API_BASE_URL}/leagues/${leagueId}/players`, {

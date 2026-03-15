@@ -7,24 +7,18 @@ interface LeagueSelectorProps {
   selectedLeagueId: string | null;
   onSelect: (leagueId: string) => void;
   onCreateLeague?: (name: string, format: LeagueFormat) => Promise<void>;
+  onDeleteLeague?: (leagueId: string) => Promise<void>;
   /** When true, renders as compact session switcher (for Setup tab) */
   compact?: boolean;
 }
 
 const formatLabel = (f: string) => f === 'round_robin' ? 'Round Robin' : f;
 
-const timeAgo = (date: Date) => {
+const formatDate = (date: Date) => {
   const d = new Date(date);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays === 1) return 'Yesterday';
-  return d.toLocaleDateString();
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' at ' +
+    d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
 const LeagueSelector: React.FC<LeagueSelectorProps> = ({
@@ -32,6 +26,7 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
   selectedLeagueId,
   onSelect,
   onCreateLeague,
+  onDeleteLeague,
   compact = false
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -39,6 +34,7 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
   const [selectedFormat, setSelectedFormat] = useState<LeagueFormat>(LeagueFormat.ROUND_ROBIN);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +50,19 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create session');
     } finally { setIsSubmitting(false); }
+  };
+
+  const handleDelete = async (leagueId: string) => {
+    if (!onDeleteLeague) return;
+    setIsSubmitting(true);
+    try {
+      await onDeleteLeague(leagueId);
+      setConfirmDeleteId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete session');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const createForm = (
@@ -115,7 +124,7 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
           <div className="landing-icon">🏓</div>
           <h1>Welcome to DinkTank</h1>
           <p className="landing-subtitle">
-            Run pickleball leagues, ladders and open play in seconds.
+            Run pickleball sessions, ladders and open play in seconds.
           </p>
         </div>
         {showCreateForm ? createForm : (
@@ -143,15 +152,47 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
             <div className="session-card-info">
               <span className="session-card-name">{league.name}</span>
               <span className="session-card-meta">
-                {formatLabel(league.format)} · Updated {timeAgo(league.updatedAt)}
+                Session Format: {formatLabel(league.format)} · Created {formatDate(league.createdAt)}
               </span>
             </div>
-            <button
-              className="session-card-btn"
-              onClick={() => onSelect(league.id)}
-            >
-              Resume
-            </button>
+            <div className="session-card-actions">
+              <button
+                className="session-card-btn"
+                onClick={() => onSelect(league.id)}
+              >
+                Resume
+              </button>
+              {onDeleteLeague && (
+                <button
+                  className="session-card-delete"
+                  onClick={() => setConfirmDeleteId(league.id)}
+                  aria-label={`Delete ${league.name}`}
+                >
+                  🗑
+                </button>
+              )}
+            </div>
+            {confirmDeleteId === league.id && (
+              <div className="session-delete-confirm">
+                <p>Delete "{league.name}" session and all its data? This cannot be undone.</p>
+                <div className="session-delete-actions">
+                  <button
+                    className="session-delete-yes"
+                    onClick={() => handleDelete(league.id)}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Deleting...' : 'Delete'}
+                  </button>
+                  <button
+                    className="session-delete-no"
+                    onClick={() => setConfirmDeleteId(null)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
