@@ -7,6 +7,7 @@ A web app for running pickleball sessions — round robin, open play, ladders. H
 ### Session Management
 - Create and resume sessions with named formats (Round Robin)
 - Landing page shows existing sessions with quick resume, or a clean welcome screen for new users
+- Session status indicator on the Setup page when an auto session is active (shows current round, time remaining, break status)
 
 ### Two Modes
 
@@ -14,11 +15,14 @@ A web app for running pickleball sessions — round robin, open play, ladders. H
 
 **Auto Mode** — Set the number of rounds, round duration, and break time. DinkTank generates all rounds upfront and auto-advances through them with timers and breaks.
 
+- Switching between modes prompts a confirmation and resets rounds while preserving players and courts
+
 ### Player & Court Setup
 - Add/remove players and courts with inline inputs (type + Enter)
 - Typeahead autocomplete for editing player assignments on any court
 - Inline conflict warnings when a player is assigned to multiple courts
 - Fair bye distribution — tracks bye counts across all rounds so everyone sits out equally
+- In auto mode, adding/removing players or courts automatically regenerates future rounds
 
 ### Round Management
 - Round-by-round navigation with clickable tabs
@@ -27,18 +31,27 @@ A web app for running pickleball sessions — round robin, open play, ladders. H
 - "Next In Line" section shows waiting players with bye counts
 
 ### TV Display Mode
-- Full-screen dark overlay optimized for big screens
-- Shows court assignments with large player names
-- Adaptive grid layout (2 columns for ≤4 courts, 3 for more)
+- Full-screen dark overlay optimized for big screens and projectors
+- Large court numbers as card headings with team matchups below (e.g., "Alice + Bob VS Carol + Dave")
+- League name and round number centered at the top
+- Responsive density scaling:
+  - 1–4 courts: full-size layout
+  - 5–6 courts: compact layout with scaled fonts
+  - 7+ courts: dense layout with 4-column grid
+- Viewport-relative font sizing (`clamp()`) scales naturally from laptops to 4K TVs
+- Dedicated large-screen media query for 2560px+ displays
+- Smooth fade-and-scale animation when a new round starts
 - Timer overlay — countdown during rounds, break timer between rounds
 - During breaks, shows "Up Next" with the next round's assignments
-- Click anywhere or ✕ to exit
+- Exit via Escape key, clicking the overlay background, or the ✕ button
 
 ### Timer System
 - Optional in manual mode, required in auto mode
 - Configurable round duration and break duration
 - Visual states: normal → amber warning (under 60s) → red pulse (expired)
 - "Time's Up" indicator on the last round only
+- Hide/show toggle — admin can hide the timer without stopping it, and bring it back anytime
+- Timer automatically unhides when a new round starts
 
 ### Settings
 - Dark mode toggle (persisted)
@@ -101,5 +114,5 @@ npm run build
 
 - **Frontend**: React 18, TypeScript, Vite
 - **Backend**: Node.js, Express, TypeScript
-- **Testing**: Jest
+- **Testing**: Jest, React Testing Library
 - **Package Management**: npm workspaces
