@@ -1901,34 +1901,35 @@ li:hover .remove-btn {
   background: #0a0a0a;
   color: #f1f5f9;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto;
 }
 
 .tv-content {
   width: 100%;
-  max-width: 1400px;
-  padding: 2.5rem 3rem;
+  max-width: 100%;
+  padding: 1rem 1.5rem;
 }
 
 .tv-header {
   display: flex;
   align-items: baseline;
   gap: 1.5rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1rem;
   border-bottom: 2px solid #1e293b;
-  padding-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
 }
 
 .tv-league {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: #94a3b8;
 }
 
 .tv-round {
-  font-size: 2.5rem;
+  font-size: 3rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #818cf8;
@@ -1969,11 +1970,11 @@ li:hover .remove-btn {
   background: #111827;
   border: 1px solid #1e293b;
   border-radius: 12px;
-  padding: 1.25rem 1.5rem;
+  padding: 1.5rem 2rem;
 }
 
 .tv-court-name {
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: #818cf8;
   text-transform: uppercase;
@@ -1989,14 +1990,14 @@ li:hover .remove-btn {
 }
 
 .tv-team {
-  font-size: 1.375rem;
+  font-size: 2rem;
   font-weight: 600;
   color: #e2e8f0;
   line-height: 1.3;
 }
 
 .tv-vs {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #475569;
   text-transform: uppercase;
@@ -2016,14 +2017,14 @@ li:hover .remove-btn {
 }
 
 .tv-waiting-label {
-  font-size: 0.875rem;
+  font-size: 1.125rem;
   font-weight: 700;
   color: #64748b;
   white-space: nowrap;
 }
 
 .tv-waiting-names {
-  font-size: 1.125rem;
+  font-size: 1.5rem;
   font-weight: 500;
   color: #94a3b8;
 }

@@ -23,12 +23,17 @@ describe('App Integration', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the app header', () => {
+  it('renders the app header', async () => {
     (api.listLeagues as any).mockResolvedValue([]);
     
     render(<App />);
     
-    expect(screen.getByText('Pickleball League Manager')).toBeInTheDocument();
+    expect(screen.getByText('🏓 DinkTank')).toBeInTheDocument();
+
+    // Wait for async loadLeagues to settle
+    await waitFor(() => {
+      expect(api.listLeagues).toHaveBeenCalled();
+    });
   });
 
   it('loads leagues on mount', async () => {
@@ -63,7 +68,7 @@ describe('App Integration', () => {
     render(<App />);
     
     await waitFor(() => {
-      expect(screen.getByText('Select League')).toBeInTheDocument();
+      expect(screen.getByText('Your Sessions')).toBeInTheDocument();
     });
   });
 });

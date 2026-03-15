@@ -20,9 +20,9 @@ describe('LeagueSelector', () => {
     }
   ];
 
-  it('should render league options', () => {
+  it('should render league session cards', () => {
     const mockOnSelect = jest.fn();
-    
+
     render(
       <LeagueSelector
         leagues={mockLeagues}
@@ -31,14 +31,14 @@ describe('LeagueSelector', () => {
       />
     );
 
-    expect(screen.getByText('Select League')).toBeInTheDocument();
-    expect(screen.getByText(/Summer League \(Round Robin\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Winter League \(Round Robin\)/)).toBeInTheDocument();
+    expect(screen.getByText('Your Sessions')).toBeInTheDocument();
+    expect(screen.getByText('Summer League')).toBeInTheDocument();
+    expect(screen.getByText('Winter League')).toBeInTheDocument();
   });
 
-  it('should call onSelect when a league is selected', () => {
+  it('should call onSelect when Resume is clicked', () => {
     const mockOnSelect = jest.fn();
-    
+
     render(
       <LeagueSelector
         leagues={mockLeagues}
@@ -47,16 +47,16 @@ describe('LeagueSelector', () => {
       />
     );
 
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: '1' } });
+    const resumeButtons = screen.getAllByText('Resume');
+    fireEvent.click(resumeButtons[0]);
 
     expect(mockOnSelect).toHaveBeenCalledWith('1');
   });
 
-  it('should display currently selected league', () => {
+  it('should highlight the selected league card as active', () => {
     const mockOnSelect = jest.fn();
-    
-    render(
+
+    const { container } = render(
       <LeagueSelector
         leagues={mockLeagues}
         selectedLeagueId="1"
@@ -64,12 +64,14 @@ describe('LeagueSelector', () => {
       />
     );
 
-    expect(screen.getByText(/Currently selected: Summer League/)).toBeInTheDocument();
+    const activeCard = container.querySelector('.session-card.active');
+    expect(activeCard).toBeInTheDocument();
+    expect(activeCard).toHaveTextContent('Summer League');
   });
 
-  it('should show message when no leagues available', () => {
+  it('should show welcome page when no leagues available', () => {
     const mockOnSelect = jest.fn();
-    
+
     render(
       <LeagueSelector
         leagues={[]}
@@ -78,6 +80,7 @@ describe('LeagueSelector', () => {
       />
     );
 
-    expect(screen.getByText(/No leagues available/)).toBeInTheDocument();
+    expect(screen.getByText('Welcome to DinkTank')).toBeInTheDocument();
+    expect(screen.getByText('Start New Session')).toBeInTheDocument();
   });
 });
