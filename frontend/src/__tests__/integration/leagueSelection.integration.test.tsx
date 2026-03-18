@@ -86,15 +86,15 @@ describe('League Selection Integration Tests', () => {
       expect(screen.getByText('Tuesday Ladder')).toBeInTheDocument();
     });
 
-    // Context bar should be visible with league info
-    expect(screen.getByText('League')).toBeInTheDocument();
+    // Context bar should be visible with league info and format badge
     expect(screen.getByText('Round Robin')).toBeInTheDocument();
+    expect(screen.getByText('Change Session')).toBeInTheDocument();
 
     // Setup tab should be active with PlayerManager and CourtManager
     // Use the h2 headings inside the manager components to verify they're rendered
-    const playerHeading = screen.getByRole('heading', { name: 'Players' });
+    const playerHeading = screen.getByRole('heading', { name: /^Players/ });
     expect(playerHeading).toBeInTheDocument();
-    const courtHeading = screen.getByRole('heading', { name: 'Courts' });
+    const courtHeading = screen.getByRole('heading', { name: /^Courts/ });
     expect(courtHeading).toBeInTheDocument();
   });
 

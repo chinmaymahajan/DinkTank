@@ -271,7 +271,7 @@ describe('Round Generation & Display Integration Tests', () => {
 
     // Wait for Setup tab content
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
     });
 
     // The start session button should be disabled

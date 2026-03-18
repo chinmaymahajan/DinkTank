@@ -132,7 +132,7 @@ async function renderAndSetupAutoMode(opts: {
 
   // Wait for Setup tab
   await waitFor(() => {
-    expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
   });
 
   // Switch to Auto mode (sessionMode defaults to 'manual' since localStorage returns null for it)
@@ -441,7 +441,7 @@ describe('Auto Mode Timer & Break Flow Integration Tests', () => {
     fireEvent.click(setupTab);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
     });
 
     // Mock addPlayer and regenerateFutureRounds

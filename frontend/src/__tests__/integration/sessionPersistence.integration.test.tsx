@@ -72,7 +72,7 @@ function setupApiMocks(opts: { roundsGenerated?: boolean } = {}) {
 async function selectLeagueAndGoToSetup() {
   await waitFor(() => expect(screen.getByText('Your Sessions')).toBeInTheDocument());
   fireEvent.click(screen.getByText('Resume'));
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument());
 }
 
 async function switchToAutoAndStart() {
