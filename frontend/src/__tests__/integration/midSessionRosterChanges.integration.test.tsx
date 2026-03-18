@@ -127,7 +127,7 @@ async function renderInAutoMode(opts: { totalRounds?: number; breakMinutes?: num
 
   // Wait for Setup tab to fully load
   await waitFor(() => {
-    expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
   });
 
   // Switch to Auto mode
@@ -147,7 +147,7 @@ async function navigateToSetupTab() {
   const setupTab = screen.getByRole('button', { name: 'Setup' });
   fireEvent.click(setupTab);
   await waitFor(() => {
-    expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
   });
 }
 
@@ -268,7 +268,7 @@ describe('Mid-Session Roster Changes', () => {
       await renderInManualMode();
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
       });
 
       // Start session and Round 1
@@ -315,7 +315,7 @@ describe('Mid-Session Roster Changes', () => {
       await renderInManualMode();
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
       });
 
       // Start session and Round 1
@@ -366,7 +366,7 @@ describe('Mid-Session Roster Changes', () => {
       await renderInManualMode();
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
       });
 
       // Start session and Round 1

@@ -30,6 +30,16 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [importNames, setImportNames] = useState<string[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-dismiss errors after 5 seconds
+  useEffect(() => {
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    if (error) {
+      errorTimerRef.current = setTimeout(() => setError(null), 5000);
+    }
+    return () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); };
+  }, [error]);
 
   useEffect(() => {
     if (!isSubmitting && shouldRefocus.current) {
@@ -131,7 +141,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
   return (
     <div className="player-manager">
-      <h2>Players</h2>
+      <h2>Players <span className="player-count-badge">{players.length}</span></h2>
       <form onSubmit={handleSubmit}>
         <div className="input-group">
           <input
@@ -152,10 +162,10 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
           <button
             type="button"
             className="import-btn"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => { setError(null); fileInputRef.current?.click(); }}
             disabled={isSubmitting}
             title="Import players from Excel/CSV"
-          >📥 Import</button>
+          >📥 Import (.xlsx, .csv)</button>
           <input
             ref={fileInputRef}
             type="file"
@@ -180,7 +190,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </ul>
             <div className="import-preview-actions">
               <button className="import-confirm-btn" onClick={handleImportConfirm}>Import All</button>
-              <button className="import-cancel-btn" onClick={() => { setShowImportPreview(false); setImportNames([]); }}>Cancel</button>
+              <button className="import-cancel-btn" onClick={() => { setShowImportPreview(false); setImportNames([]); setError(null); }}>Cancel</button>
             </div>
           </div>
         </div>

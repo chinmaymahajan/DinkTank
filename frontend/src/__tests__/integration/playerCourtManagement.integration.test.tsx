@@ -53,8 +53,8 @@ async function renderWithSelectedLeague(
 
   // Ensure Setup tab content is visible (PlayerManager + CourtManager)
   await waitFor(() => {
-    expect(screen.getByRole('heading', { name: 'Players' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Courts' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Players/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Courts/ })).toBeInTheDocument();
   });
 
   // Wait for loadLeagueData to finish (loading overlay disappears)

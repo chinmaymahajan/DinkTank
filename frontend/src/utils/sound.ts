@@ -7,20 +7,69 @@ export function suppressBuzzerFor(ms: number) {
   _buzzerSuppressedUntil = Date.now() + ms;
 }
 
+// Shared AudioContext — created once, resumed on first user gesture.
+let _sharedCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  try {
+    const AudioCtx = typeof AudioContext !== 'undefined' ? AudioContext : (typeof (window as any).webkitAudioContext !== 'undefined' ? (window as any).webkitAudioContext : null);
+    if (!AudioCtx) return null;
+    if (!_sharedCtx || _sharedCtx.state === 'closed') {
+      _sharedCtx = new AudioCtx();
+    }
+    return _sharedCtx;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Warm up the AudioContext by resuming it during a user gesture.
+ * Call this from any click/touch handler (e.g. "Start Session") so the
+ * context is unlocked before the timer fires automatically.
+ */
+export function warmUpAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+// Auto-warm on first user interaction so the buzzer works even if
+// warmUpAudio() isn't called explicitly.
+if (typeof window !== 'undefined') {
+  const autoWarm = () => {
+    warmUpAudio();
+    window.removeEventListener('click', autoWarm);
+    window.removeEventListener('touchstart', autoWarm);
+    window.removeEventListener('keydown', autoWarm);
+  };
+  window.addEventListener('click', autoWarm, { once: true });
+  window.addEventListener('touchstart', autoWarm, { once: true });
+  window.addEventListener('keydown', autoWarm, { once: true });
+}
+
 export function playBuzzer() {
   try {
     if (Date.now() < _buzzerSuppressedUntil) return;
 
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // Resume just in case (no-op if already running)
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     const now = ctx.currentTime;
     const duration = 2.0;
 
     // Master output with sharp attack and abrupt cutoff
     const master = ctx.createGain();
     master.gain.setValueAtTime(0, now);
-    master.gain.linearRampToValueAtTime(0.8, now + 0.02);   // near-instant attack
-    master.gain.setValueAtTime(0.8, now + duration - 0.05);  // hold until the end
-    master.gain.linearRampToValueAtTime(0, now + duration);   // hard stop
+    master.gain.linearRampToValueAtTime(0.8, now + 0.02);
+    master.gain.setValueAtTime(0.8, now + duration - 0.05);
+    master.gain.linearRampToValueAtTime(0, now + duration);
     master.connect(ctx.destination);
 
     // Compressor — keeps it loud and flat like a PA horn
@@ -32,7 +81,6 @@ export function playBuzzer() {
     comp.connect(master);
 
     // Band-pass filter — basketball buzzers sit in a narrow mid-range band
-    // centered around 300-400 Hz with no highs and limited lows
     const bpf = ctx.createBiquadFilter();
     bpf.type = 'bandpass';
     bpf.frequency.value = 370;
@@ -51,7 +99,7 @@ export function playBuzzer() {
     // Second voice — slightly detuned for that thick, beating quality
     const osc2 = ctx.createOscillator();
     osc2.type = 'sawtooth';
-    osc2.frequency.value = 263; // 3 Hz beat against osc1
+    osc2.frequency.value = 263;
     const g2 = ctx.createGain();
     g2.gain.value = 0.55;
     osc2.connect(g2);
@@ -72,8 +120,11 @@ export function playBuzzer() {
       o.stop(now + duration);
     });
 
-    // Clean up
-    setTimeout(() => ctx.close().catch(() => {}), (duration + 0.5) * 1000);
+    // Disconnect nodes after playback to free resources (don't close the shared ctx)
+    setTimeout(() => {
+      [osc1, osc2, osc3].forEach(o => o.disconnect());
+      [g1, g2, g3, bpf, comp, master].forEach(n => n.disconnect());
+    }, (duration + 0.5) * 1000);
   } catch {
     // Silently fail if audio isn't available
   }

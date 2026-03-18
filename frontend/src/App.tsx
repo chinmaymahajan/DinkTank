@@ -14,7 +14,7 @@ import { api } from './api/client';
 import { League, Player, Court, Round, Assignment, LeagueFormat } from './types';
 import CourtIcon from './components/CourtIcon';
 import PickleballIcon from './components/PickleballIcon';
-import { playBuzzer, suppressBuzzerFor } from './utils/sound';
+import { playBuzzer, suppressBuzzerFor, warmUpAudio } from './utils/sound';
 import log from './utils/logger';
 
 
@@ -70,6 +70,7 @@ function App() {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
   });
+  const [showDevTools, setShowDevTools] = useState(false);
 
   // Per-league session state cache — preserves timer/break state when switching leagues
   interface LeagueSessionState {
@@ -878,6 +879,7 @@ function App() {
 
   const handleStartAutoSession = async () => {
     if (!selectedLeagueId) return;
+    warmUpAudio(); // Unlock AudioContext on this user gesture
     log.round.info('handleStartAutoSession — generating', totalRoundsPlanned, 'rounds, duration:', roundDurationMinutes, 'min, break:', breakMinutes, 'min');
     setError(null);
     setSuccessMessage(null);
@@ -1034,37 +1036,49 @@ function App() {
     <div className={`app ${darkMode ? 'dark' : ''}`}>
       <header>
         <h1><PickleballIcon size={28} /> Pickle Admin</h1>
-        <button
-          className="theme-toggle"
-          onClick={() => setDarkMode(!darkMode)}
-          aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {darkMode ? '☀️' : '🌙'}
-        </button>
+        <div className="header-actions">
+          <button
+            className="dev-tools-secret"
+            onClick={() => setShowDevTools(!showDevTools)}
+            aria-label="Toggle dev tools"
+          />
+          <button
+            className="theme-toggle"
+            onClick={() => setDarkMode(!darkMode)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+          {showDevTools && (
+            <div className="dev-tools-dropdown">
+              <DevTools
+                onSeedData={handleSeedMockData}
+                onClearData={handleClearAllData}
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       {selectedLeague && (
         <div className="context-bar">
-          <button className="context-item context-item-link" onClick={() => handleSelectLeague('')}>
-            <span className="context-label">League</span>
-            <span className="context-value">{selectedLeague.name}</span>
-            <span className="context-change">Change</span>
-          </button>
-          <div className="context-item">
-            <span className="context-label">Format</span>
-            <span className="context-value">{formatLabel(selectedLeague.format)}</span>
+          <div className="context-bar-title">
+            <h2 className="session-title">{selectedLeague.name} <span className="session-format-badge">{formatLabel(selectedLeague.format)}</span></h2>
+            <button className="change-session-btn" onClick={() => handleSelectLeague('')}>Change Session</button>
           </div>
-          <div className="context-item">
-            <span className="context-label">Players</span>
-            <span className="context-value">{players.length}</span>
-          </div>
-          <div className="context-item">
-            <span className="context-label">Courts</span>
-            <span className="context-value">{courts.length}</span>
-          </div>
-          <div className="context-item">
-            <span className="context-label">Rounds</span>
-            <span className="context-value">{rounds.length}</span>
+          <div className="context-bar-stats">
+            <div className="context-item">
+              <span className="context-label">Players</span>
+              <span className="context-value">{players.length}</span>
+            </div>
+            <div className="context-item">
+              <span className="context-label">Courts</span>
+              <span className="context-value">{courts.length}</span>
+            </div>
+            <div className="context-item">
+              <span className="context-label">Rounds</span>
+              <span className="context-value">{rounds.length}</span>
+            </div>
           </div>
         </div>
       )}
@@ -1092,11 +1106,6 @@ function App() {
       )}
 
       <main>
-        <DevTools
-          onSeedData={handleSeedMockData}
-          onClearData={handleClearAllData}
-        />
-
         {!selectedLeagueId ? (
           <LeagueSelector
             leagues={leagues}
@@ -1142,15 +1151,6 @@ function App() {
                   </div>
                 )}
 
-                <section className="league-section">
-                  <LeagueSelector
-                    leagues={leagues}
-                    selectedLeagueId={selectedLeagueId}
-                    onSelect={handleSelectLeague}
-                    onCreateLeague={handleCreateLeague}
-                    compact
-                  />
-                </section>
 
                 <div className="management-section">
                   <PlayerManager
@@ -1194,8 +1194,8 @@ function App() {
                       )}
                       <p className="setting-hint">
                         {sessionMode === 'manual'
-                          ? 'You start each round'
-                          : 'Rounds advance when timer ends'}
+                          ? 'You start each round manually'
+                          : 'Auto — rounds advance automatically when the timer ends'}
                       </p>
                     </div>
 
@@ -1212,16 +1212,23 @@ function App() {
                             <span className="optional-badge">optional</span>
                           </label>
                           {timerEnabled && (
-                            <div className="duration-input-row">
-                              <input
-                                type="number"
-                                min="1"
-                                max="60"
-                                value={roundDurationMinutes}
-                                onChange={(e) => setRoundDurationMinutes(Math.max(1, Number(e.target.value)))}
-                              />
-                              <span className="duration-unit">min</span>
-                            </div>
+                            <>
+                              <div className="duration-input-row">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="30"
+                                  value={roundDurationMinutes}
+                                  onChange={(e) => setRoundDurationMinutes(Math.min(30, Math.max(1, Number(e.target.value))))}
+                                />
+                                <span className="duration-unit">min</span>
+                              </div>
+                              <div className="duration-presets">
+                                {[10, 12, 15].map(m => (
+                                  <button key={m} className={`preset-chip ${roundDurationMinutes === m ? 'active' : ''}`} onClick={() => setRoundDurationMinutes(m)}>{m} min</button>
+                                ))}
+                              </div>
+                            </>
                           )}
                         </>
                       ) : (
@@ -1231,11 +1238,16 @@ function App() {
                             <input
                               type="number"
                               min="1"
-                              max="60"
+                              max="30"
                               value={roundDurationMinutes}
-                              onChange={(e) => setRoundDurationMinutes(Math.max(1, Number(e.target.value)))}
+                              onChange={(e) => setRoundDurationMinutes(Math.min(30, Math.max(1, Number(e.target.value))))}
                             />
                             <span className="duration-unit">min</span>
+                          </div>
+                          <div className="duration-presets">
+                            {[10, 12, 15].map(m => (
+                              <button key={m} className={`preset-chip ${roundDurationMinutes === m ? 'active' : ''}`} onClick={() => setRoundDurationMinutes(m)}>{m} min</button>
+                            ))}
                           </div>
                         </>
                       )}
@@ -1248,11 +1260,16 @@ function App() {
                           <input
                             type="number"
                             min="0"
-                            max="30"
+                            max="15"
                             value={breakMinutes}
-                            onChange={(e) => setBreakMinutes(Math.max(0, Number(e.target.value)))}
+                            onChange={(e) => setBreakMinutes(Math.min(15, Math.max(0, Number(e.target.value))))}
                           />
                           <span className="duration-unit">min</span>
+                        </div>
+                        <div className="duration-presets">
+                          {[2, 3, 5].map(m => (
+                            <button key={m} className={`preset-chip ${breakMinutes === m ? 'active' : ''}`} onClick={() => setBreakMinutes(m)}>{m} min</button>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1264,9 +1281,9 @@ function App() {
                           <input
                             type="number"
                             min="1"
-                            max="50"
+                            max="25"
                             value={totalRoundsPlanned}
-                            onChange={(e) => setTotalRoundsPlanned(Math.max(1, Number(e.target.value)))}
+                            onChange={(e) => setTotalRoundsPlanned(Math.min(25, Math.max(1, Number(e.target.value))))}
                           />
                           <span className="duration-unit">rounds</span>
                         </div>
@@ -1287,8 +1304,28 @@ function App() {
                   <div className="start-session-stats">
                     <span className={`stat ${players.length >= 4 ? 'ready' : ''}`}>🧍 {players.length} player{players.length !== 1 ? 's' : ''}</span>
                     <span className={`stat ${courts.length >= 1 ? 'ready' : ''}`}><CourtIcon size={16} /> {courts.length} court{courts.length !== 1 ? 's' : ''}</span>
-                    <span className="stat">{timerEnabled ? `⏱ ${roundDurationMinutes}m rounds` : '⏱ No timer'}</span>
+                    <span className="stat">{timerEnabled ? `⏱ ${roundDurationMinutes} min rounds` : '⏱ No timer'}</span>
                   </div>
+                  {sessionMode === 'auto' && rounds.length === 0 && (
+                    <div className="session-preview">
+                      <span className="session-preview-item">📋 {totalRoundsPlanned} round{totalRoundsPlanned !== 1 ? 's' : ''}</span>
+                      <span className="session-preview-item">
+                        🏁 Ends ~{(() => {
+                          const totalMin = totalRoundsPlanned * roundDurationMinutes + Math.max(0, totalRoundsPlanned - 1) * breakMinutes;
+                          const end = new Date(Date.now() + totalMin * 60 * 1000);
+                          return end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                        })()}
+                      </span>
+                      <span className="session-preview-item session-preview-duration">
+                        ~{(() => {
+                          const totalMin = Math.round(totalRoundsPlanned * roundDurationMinutes + Math.max(0, totalRoundsPlanned - 1) * breakMinutes);
+                          const h = Math.floor(totalMin / 60);
+                          const m = totalMin % 60;
+                          return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        })()} total
+                      </span>
+                    </div>
+                  )}
                   {players.length < 4 && (
                     <p className="start-session-hint">Add at least 4 players to start</p>
                   )}
