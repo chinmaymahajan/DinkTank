@@ -3161,3 +3161,56 @@ li:hover .remove-btn {
   border-right: none;
   border-top: none;
 }
+
+/* ============================================
+   Onboarding Tour — Mobile
+   ============================================ */
+.tour-tooltip-mobile {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  max-width: 100%;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  animation: tourSlideUp 0.25s ease-out;
+}
+
+@keyframes tourSlideUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 767px) {
+  .tour-tooltip {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    transform: none !important;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    animation: tourSlideUp 0.25s ease-out;
+  }
+
+  .tour-tooltip::before,
+  .tour-tooltip::after {
+    display: none;
+  }
+
+  .tour-highlight {
+    box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(99, 102, 241, 0.15);
+  }
+
+  .tour-next {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+  }
+
+  .tour-description {
+    font-size: 0.8125rem;
+  }
+}

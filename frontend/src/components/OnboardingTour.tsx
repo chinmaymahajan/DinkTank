@@ -51,9 +51,21 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, onComplete }) =
   const [step, setStep] = useState(0);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const [arrowClass, setArrowClass] = useState('');
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  const checkMobile = useCallback(() => {
+    setIsMobile(window.innerWidth < 768);
+  }, []);
+
   const positionTooltip = useCallback(() => {
+    if (isMobile) {
+      // Mobile: fixed bottom sheet, no absolute positioning needed
+      setTooltipStyle({});
+      setArrowClass('');
+      return;
+    }
+
     const current = TOUR_STEPS[step];
     if (!current) return;
     const el = document.querySelector(`[data-tour="${current.target}"]`);
@@ -93,18 +105,31 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, onComplete }) =
 
     setTooltipStyle({ position: 'absolute', top, left, transform });
     setArrowClass(`tour-arrow-${pos}`);
-  }, [step]);
+  }, [step, isMobile]);
 
   useEffect(() => {
     if (!active) return;
+    checkMobile();
     positionTooltip();
-    window.addEventListener('resize', positionTooltip);
+    const onResize = () => { checkMobile(); positionTooltip(); };
+    window.addEventListener('resize', onResize);
     window.addEventListener('scroll', positionTooltip, true);
     return () => {
-      window.removeEventListener('resize', positionTooltip);
+      window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', positionTooltip, true);
     };
-  }, [active, step, positionTooltip]);
+  }, [active, step, positionTooltip, checkMobile]);
+
+  // Scroll target into view on mobile
+  useEffect(() => {
+    if (!active || !isMobile) return;
+    const current = TOUR_STEPS[step];
+    if (!current) return;
+    const el = document.querySelector(`[data-tour="${current.target}"]`);
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [active, step, isMobile]);
 
   // Highlight the current target element
   useEffect(() => {
@@ -140,8 +165,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ active, onComplete }) =
       <div className="tour-overlay" onClick={handleSkip} />
       <div
         ref={tooltipRef}
-        className={`tour-tooltip ${arrowClass}`}
-        style={tooltipStyle}
+        className={`tour-tooltip ${isMobile ? 'tour-tooltip-mobile' : arrowClass}`}
+        style={isMobile ? undefined : tooltipStyle}
         role="dialog"
         aria-label={`Tour step ${step + 1} of ${TOUR_STEPS.length}`}
       >
