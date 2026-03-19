@@ -44,6 +44,11 @@ function createLogger(category: string) {
     info: (...args: unknown[]) => {
       if (shouldLog('info')) console.log(prefix, ...args);
       Sentry.logger.info(`${prefix} ${args.map(String).join(' ')}`, attrs);
+      Sentry.addBreadcrumb({
+        category,
+        message: args.map(String).join(' '),
+        level: 'info',
+      });
     },
     warn: (...args: unknown[]) => {
       if (shouldLog('warn')) console.warn(prefix, ...args);
