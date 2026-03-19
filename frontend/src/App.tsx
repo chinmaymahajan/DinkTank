@@ -10,7 +10,7 @@ import {
   DevTools,
   TVDisplay
 } from './components';
-import OnboardingTour, { STORAGE_KEY as TOUR_STORAGE_KEY } from './components/OnboardingTour';
+// import OnboardingTour, { STORAGE_KEY as TOUR_STORAGE_KEY } from './components/OnboardingTour';
 import { api } from './api/client';
 import { League, Player, Court, Round, Assignment, LeagueFormat } from './types';
 import CourtIcon from './components/CourtIcon';
@@ -72,9 +72,9 @@ function App() {
     return saved ? JSON.parse(saved) : false;
   });
   const [showDevTools, setShowDevTools] = useState(false);
-  const [showTour, setShowTour] = useState(() => {
-    return !localStorage.getItem(TOUR_STORAGE_KEY);
-  });
+  // const [showTour, setShowTour] = useState(() => {
+  //   return !localStorage.getItem(TOUR_STORAGE_KEY);
+  // });
 
   // Per-league session state cache — preserves timer/break state when switching leagues
   interface LeagueSessionState {
@@ -1473,6 +1473,7 @@ function App() {
         )}
       </main>
 
+      {/* Onboarding tour — uncomment to enable
       {selectedLeagueId && activeTab === 'setup' && (
         <OnboardingTour
           active={showTour}
@@ -1482,6 +1483,7 @@ function App() {
           }}
         />
       )}
+      */}
 
       {tvMode && currentRound && selectedLeague && (() => {
         const tvRound = sessionMode === 'auto' && autoActiveRound ? autoActiveRound : currentRound;
