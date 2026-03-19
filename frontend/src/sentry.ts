@@ -9,6 +9,19 @@
  */
 import * as Sentry from '@sentry/react';
 
+/** Parse user agent into a human-readable device name */
+function getDeviceName(): string {
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/Macintosh/.test(ua)) return 'Mac';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Windows/.test(ua)) return 'Windows PC';
+  if (/CrOS/.test(ua)) return 'Chromebook';
+  if (/Linux/.test(ua)) return 'Linux';
+  return 'Unknown';
+}
+
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || '',
 
@@ -36,6 +49,14 @@ Sentry.init({
 
   // Only send events in production (flip to true to test locally)
   enabled: import.meta.env.PROD,
+
+  // Tag every event with a readable device name for easy filtering
+  initialScope: {
+    tags: {
+      device: getDeviceName(),
+      screenWidth: String(window.screen?.width ?? 'unknown'),
+    },
+  },
 
   // Enable the Sentry.logger API (structured logs)
   _experiments: {

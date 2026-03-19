@@ -138,10 +138,10 @@ function App() {
     }
   }, [selectedLeagueId]);
 
-  // Persist auto session state whenever key values change (skip during restore)
+  // Persist session state whenever key values change (skip during restore)
   useEffect(() => {
     if (!initialLoadDone.current || isRestoringSession.current) return;
-    if (!selectedLeagueId || sessionMode !== 'auto') return;
+    if (!selectedLeagueId) return;
     saveSessionState(selectedLeagueId, {
       autoActiveRound,
       timerEndTime,
@@ -545,7 +545,7 @@ function App() {
 
       // Restore auto session state if available
       const cached = loadSessionState(leagueId, roundsData);
-      if (cached && sessionMode === 'auto' && roundsData.length > 0) {
+      if (cached && roundsData.length > 0) {
         log.app.info('Restoring auto session state — activeRound:', cached.autoActiveRound?.roundNumber ?? 'none', 'isOnBreak:', cached.isOnBreak, 'timerEndTime:', cached.timerEndTime);
         suppressAdvanceRef.current = true; // Prevent auto-advance from firing on restored expired timer
         if (cached.timerEndTime !== null && cached.timerEndTime <= Date.now()) {
@@ -562,7 +562,7 @@ function App() {
         setActiveTab(cached.activeTab);
         setCurrentRound(cached.autoActiveRound || roundsData[roundsData.length - 1]);
       } else {
-        log.app.info('No cached session state — using defaults for league', leagueId);
+        log.app.warn('No cached session state — using defaults for league', leagueId);
         // No cached state — reset to defaults
         setAutoActiveRound(null);
         setIsOnBreak(false);
