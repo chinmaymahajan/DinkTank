@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { League, LeagueFormat } from '../types';
 import FormatSelector from './FormatSelector';
+import appLogo from '/pickleball_app_logo.png';
 import log from '../utils/logger';
 
 interface LeagueSelectorProps {
@@ -125,7 +126,7 @@ const LeagueSelector: React.FC<LeagueSelectorProps> = ({
     return (
       <div className="landing-page">
         <div className="landing-hero">
-          <div className="landing-icon"><img src="/pickleball_app_logo.png" alt="Pickle Admin" width={64} height={64} style={{ borderRadius: 12 }} /></div>
+          <div className="landing-icon"><img src={appLogo} alt="Pickle Admin" width={64} height={64} style={{ borderRadius: 12 }} /></div>
           <h1>Welcome to Pickle Admin</h1>
           <p className="landing-subtitle">
             Run pickleball sessions, ladders and open play in seconds.
