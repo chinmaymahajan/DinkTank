@@ -73,6 +73,15 @@ Pickle Admin handles the tedious parts of running pickleball sessions: assigning
 - DSN provided at build time via `VITE_SENTRY_DSN` environment variable
 - Disabled in development, enabled in production builds
 
+### Themes & Design
+- Two switchable color themes from the header dropdown:
+  - Classic — clean indigo/slate palette with Fira Sans typography
+  - Court Neon — dark navy (#1A1A2E) + lime (#C8E64A) accents with Space Grotesk font, pill-shaped round tabs, 3-column court cards, styled bench section, and a dark hero timer banner
+- Both themes support light and dark mode
+- Framer Motion page transitions between Setup and Rounds tabs (fade + slide, 200ms)
+- Design system persisted in `design-system/` for consistency across sessions
+- `prefers-reduced-motion` respected
+
 ### Other
 - Dark mode (persisted)
 - Dev tools: seed 26 players + 6 courts for quick testing
@@ -138,6 +147,7 @@ pickle-admin/
 │       ├── data/          # In-memory data store
 │       ├── routes/        # REST endpoints
 │       └── models/        # Data models
+├── design-system/         # Persisted design system (Master + page overrides)
 ├── .kiro/specs/           # Feature specifications (requirements, design, tasks)
 └── .github/workflows/     # GitHub Pages deployment (with Sentry DSN injection)
 ```
@@ -147,10 +157,12 @@ The backend folder contains the original Express API with the same business logi
 ## Tech Stack
 
 - React 18, TypeScript, Vite
+- Framer Motion (page transitions)
 - Sentry (error monitoring, tracing, session replay)
 - Jest + React Testing Library + fast-check (property-based testing)
 - GitHub Pages (static deployment)
 - Web Audio API (timer sound effects)
+- Google Fonts: Fira Sans, Fira Code, Space Grotesk
 
 ## License
 
